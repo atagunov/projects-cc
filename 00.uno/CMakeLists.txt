@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.31)
+project(00.uno CXX)
+add_executable(00.uno src/main.cc)
+find_package(Boost REQUIRED)
+target_link_libraries(00.uno Boost::log)
+install(TARGETS 00.uno)

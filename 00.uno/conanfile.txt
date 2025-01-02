@@ -1,0 +1,13 @@
+[requires]
+boost/1.86.0
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[options]
+*:shared=True
+
+[layout]
+cmake_layout
+
