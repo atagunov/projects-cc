@@ -1,6 +1,5 @@
 #include <iostream>
-#include <string>
-#include<boost/log/trivial.hpp>
+#include <boost/log/trivial.hpp>
 
 using std::cout;
 using std::endl;
