@@ -9,6 +9,7 @@ class UnoRecipe(ConanFile):
 
     def requirements(self):
         self.requires("boost/[^1]")
+        self.requires("gtest/[^1]")
 
     def layout(self):
         cmake_layout(self)
