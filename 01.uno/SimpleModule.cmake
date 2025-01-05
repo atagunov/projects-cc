@@ -48,6 +48,7 @@ function(simple_module)
         list(TRANSFORM ARGV REPLACE "(.+)" "$<TARGET_OBJECTS:\\1>" OUTPUT_VARIABLE dep_objects)
     else()
         message("-- simple module: ${mod}")
+        # it seems there is really no way to have empty OBJECT libraries presently in cmake
         set(dep_objects "$<TARGET_OBJECTS:simple-module-empty-object-library>")
     endif()
 
