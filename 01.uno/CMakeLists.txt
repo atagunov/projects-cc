@@ -12,6 +12,7 @@ add_library(global-includes INTERFACE)
 target_include_directories(global-includes INTERFACE "${PROJECT_SOURCE_DIR}/src")
 
 include("SimpleModule.cmake")
+include(GoogleTest)
 
 add_subdirectory(src)
 add_subdirectory(test)
