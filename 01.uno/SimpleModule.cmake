@@ -45,19 +45,20 @@ function(simple_module)
 
     if(ARGV)
         message("-- simple module: ${mod} [${ARGV}]")
-        list(TRANSFORM ARGV REPLACE "(.+)" "$<TARGET_OBJECTS:\\1>")
-        add_library(${mod}-dependencies OBJECT ${ARGV})
-        target_link_libraries(${mod}-dependencies PRIVATE global-includes)
+        list(TRANSFORM ARGV REPLACE "(.+)" "$<TARGET_OBJECTS:\\1>" OUTPUT_VARIABLE dep_objects)
     else()
         message("-- simple module: ${mod}")
-        # it seems there is really no way to have empty OBJECT libraries presently in cmake
-        set(empty_file "${CMAKE_CURRENT_BINARY_DIR}/empty.cc")
-        if(NOT EXISTS ${empty_file})
-            file(TOUCH ${empty_file})
-        endif()
-        add_library(${mod}-dependencies OBJECT ${empty_file})
+        set(dep_objects "$<TARGET_OBJECTS:simple-module-empty-object-library>")
     endif()
 
+    add_library(${mod}-dependencies OBJECT ${dep_objects})
+
     add_library(${mod} OBJECT ${src_file})
-    target_link_libraries(${mod} PRIVATE global-includes ${mod}-dependencies)
+    target_link_libraries(${mod} PRIVATE global-includes)
+    target_link_libraries(${mod} INTERFACE ${mod}-dependencies)
 endfunction()
+
+add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/empty.cc"
+    COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_BINARY_DIR}/empty.cc")
+
+add_library(simple-module-empty-object-library OBJECT "${CMAKE_BINARY_DIR}/empty.cc")
