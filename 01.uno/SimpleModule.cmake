@@ -29,34 +29,78 @@
 # If we were building a library we could have included both "src" (for our private headers)
 # and a separate "include" folder which would then contain the public API of our library
 
-function(simple_module)
-    if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL "${PROJECT_SOURCE_DIR}/src")
+function(simple_module_compute_internals)
+    list(POP_FRONT ARGV kind src_file)
+
+    if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL "${PROJECT_SOURCE_DIR}/${kind}")
         set(mod_prefix "")
     else()
         cmake_path(RELATIVE_PATH CMAKE_CURRENT_SOURCE_DIR
-                BASE_DIRECTORY "${PROJECT_SOURCE_DIR}/src"
+                BASE_DIRECTORY "${PROJECT_SOURCE_DIR}/${kind}"
                 OUTPUT_VARIABLE rel_dir)
         string(REPLACE "/" "-" mod_prefix "${rel_dir}/")
     endif()
 
-    list(POP_FRONT ARGV src_file)
-    string(REGEX REPLACE "\\..*" "" mod_suffix ${src_file})
-    set(mod "${mod_prefix}${mod_suffix}")
+    set(print_deps ${ARGV})
+    set(raw_deps ${ARGV})
+    set(obj_deps ${ARGV})
+    list(FILTER raw_deps INCLUDE REGEX "::")
+    list(FILTER obj_deps EXCLUDE REGEX "::")
 
-    if(ARGV)
-        message("-- simple module: ${mod} [${ARGV}]")
-        list(TRANSFORM ARGV REPLACE "(.+)" "$<TARGET_OBJECTS:\\1>" OUTPUT_VARIABLE dep_objects)
-    else()
-        message("-- simple module: ${mod}")
-        # it seems there is really no way to have empty OBJECT libraries presently in cmake
-        set(dep_objects "$<TARGET_OBJECTS:simple-module-empty-object-library>")
+    if(obj_deps)
+        list(TRANSFORM obj_deps REPLACE "(^.+$)" "$<TARGET_OBJECTS:\\1>")
     endif()
 
-    add_library(${mod}-dependencies OBJECT ${dep_objects})
+    return(PROPAGATE mod_prefix src_file print_deps obj_deps raw_deps)
+endfunction()
 
+function(simple_module)
+    simple_module_compute_internals("src" ${ARGV})
+
+    #message("mod_prefix=${mod_prefix} src_file=${src_file} raw_deps=${raw_deps} obj_deps=${obj_deps}")
+    string(REGEX REPLACE "\\..*" "" mod_suffix ${src_file})
+    set(mod "${mod_prefix}${mod_suffix}")
+    message("-- simple module: ${mod} [${print_deps}]")
+
+    if (obj_deps)
+        message(">>> add_library(${mod}-dependencies OBJECT ${obj_deps})")
+        add_library(${mod}-dependencies OBJECT ${obj_deps})
+    else()
+        # it seems there is really no way to have empty OBJECT libraries presently in cmake
+        add_library(${mod}-dependencies OBJECT "$<TARGET_OBJECTS:simple-module-empty-object-library>")
+    endif()
+
+    if(raw_deps)
+        #message("${mod}-dependencies includes ${raw_deps}")
+        target_link_libraries(${mod}-dependencies PUBLIC ${raw_deps})
+    endif()
+
+    message(">>> add_library(${mod} OBJECT ${src_file})")
     add_library(${mod} OBJECT ${src_file})
     target_link_libraries(${mod} PRIVATE global-includes)
-    target_link_libraries(${mod} INTERFACE ${mod}-dependencies)
+    message(">>> target_link_libraries(${mod} PUBLIC ${mod}-dependencies)")
+    target_link_libraries(${mod} PUBLIC ${mod}-dependencies)
+endfunction()
+
+function(simple_module_test)
+    simple_module_compute_internals("test" ${ARGV})
+    string(REGEX REPLACE "-test\\..*" "" mod_suffix ${src_file})
+    set(mod "${mod_prefix}${mod_suffix}")
+
+    #message("mod=${mod} mod_prefix=${mod_prefix} src_file=${src_file} raw_deps=${raw_deps} obj_deps=${obj_deps}")
+    message("-- simple module test: ${mod}-test [${print_deps}]")
+
+    add_executable("${mod}-test" ${src_file})
+    target_link_libraries(${mod}-test global-includes)
+
+    set(mod_dependencies "${mod}-dependencies")
+
+    # not clear why a test module would depend on other modules directly.. but let's have it for completeness
+    target_link_libraries("${mod}-test" "$<TARGET_OBJECTS:${mod_dependencies}>" ${obj_deps} ${raw_deps})
+
+    if(raw_deps)
+        target_link_libraries("${mod}-test" ${raw_deps})
+    endif()
 endfunction()
 
 add_custom_command(OUTPUT "${CMAKE_BINARY_DIR}/empty.cc"

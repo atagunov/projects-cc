@@ -1,10 +1,5 @@
-#include <iostream>
-#include <boost/log/trivial.hpp>
-
-using std::cout;
-using std::endl;
+#include "uno.hh"
 
 int main() {
-    cout << "Hello world!" << endl;
-    BOOST_LOG_TRIVIAL(info) << "Exiting";
+    return uno::run_main();
 }
