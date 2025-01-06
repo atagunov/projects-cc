@@ -8,6 +8,3 @@ find_package(GTest REQUIRED)
 enable_testing()
 
 include(cmake/SimpleModules.cmake)
-
-add_subdirectory(src)
-add_subdirectory(tests)

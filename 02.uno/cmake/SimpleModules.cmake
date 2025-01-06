@@ -33,9 +33,7 @@
 # So for a library we generally expect to see "src/x.cc src/x/... include/x.hh tests/x-test.cc tests/x/.." and no other source files
 # For an executable we expect "src/main.cc src/x.cc src/x tests/x-test tests/x/..." and no other source files
 #
-# not working: This file includes "src" and "tests" directories once their -I properties have been set
-# since this feature is not working we get a bit of boilerplate for "src/CMakeLists.txt" and "tests/CMakeLists.txt"
-# these need to specify "include_directories" correctly
+# This file includes "src" and "tests" setting their -I folders accordingly
 #
 # "simple_gtest" adds "gtest::gtest" dependency
 
@@ -128,3 +126,27 @@ function(simple_gtest)
     gtest_discover_tests(${mod}-test)
 endfunction()
 
+# by convention all "internal" .hh files sit in the same folders as .cc files
+# it is easier to use include_directories than to add dependency to each target
+
+# if there are "externally visible" include files they can sit in a different folder
+# and "CMakeLists.txt" files elsewhere in the project can add them as needed
+
+include_directories("src")
+add_subdirectory("src")
+
+# by convention any file in "tests" subfolder can textually #include
+# its counterpart in "src" folder, so includes setup above work very nicely here
+
+# additionally there can be extra "test modules" - auxiliary .cc/.hh pairs doing simple_module
+# helper work shared between different tests under "tests" folder, so we do want the ability
+# to include from "tests" folder as well
+
+include_directories("tests")
+add_subdirectory("tests")
+
+# at this point we could restore INCLUDE_DIRECTORIES property on current folder
+# which is actually ${PROJECT_SOURCE_DIR}
+# we would need this if top-level CMakeLists.txt added some folders other than "src" and "tests"
+# this is a future improvement that can be made to "SimpleModules.cmake"
+# it is however not needed for the current project

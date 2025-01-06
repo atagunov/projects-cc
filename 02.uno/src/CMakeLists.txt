@@ -1,5 +1,3 @@
-include_directories(".")
-
 add_subdirectory(uno)
 
 simple_module(uno.cc Boost::log)
