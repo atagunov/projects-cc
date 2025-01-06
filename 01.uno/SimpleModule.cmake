@@ -68,7 +68,7 @@ function(simple_module)
     endif()
 endfunction()
 
-function(simple_module_test)
+function(simple_gtest)
     simple_module_compute_internals("test" ${ARGV})
     string(REGEX REPLACE "-test\\..*" "" mod_suffix ${src_file})
     set(mod "${mod_prefix}${mod_suffix}")
@@ -76,6 +76,8 @@ function(simple_module_test)
 
     add_executable(${mod}-test ${src_file})
     target_link_libraries(${mod}-test global-includes)
-    target_link_libraries(${mod}-test ${mod}-dependencies ${deps})
+    target_link_libraries(${mod}-test ${mod}-dependencies ${deps} gtest::gtest)
+
+    gtest_discover_tests(${mod}-test)
 endfunction()
 
