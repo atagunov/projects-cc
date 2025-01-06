@@ -35,21 +35,23 @@ function(simple_module_compute_internals)
 
     if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL "${PROJECT_SOURCE_DIR}/${kind}")
         set(mod_prefix "")
+        set(prefix_alias "")
     else()
         cmake_path(RELATIVE_PATH CMAKE_CURRENT_SOURCE_DIR
                 BASE_DIRECTORY "${PROJECT_SOURCE_DIR}/${kind}"
                 OUTPUT_VARIABLE rel_dir)
         string(REPLACE "/" "-" mod_prefix "${rel_dir}/")
+        string(REPLACE "/" "::" prefix_alias "${rel_dir}/")
     endif()
 
-    return(PROPAGATE src_file deps mod_prefix)
+    return(PROPAGATE src_file deps mod_prefix prefix_alias)
 endfunction()
 
 function(simple_module)
     simple_module_compute_internals("src" ${ARGV})
     string(REGEX REPLACE "\\..*" "" mod_suffix ${src_file})
     set(mod "${mod_prefix}${mod_suffix}")
-    message("-- simple module: ${mod} [${deps}]")
+    message("-- simple module: ${prefix_alias}${mod_suffix} [${deps}]")
 
     add_library(${mod}-dependencies INTERFACE)
     target_link_libraries(${mod}-dependencies INTERFACE ${deps})
@@ -60,6 +62,10 @@ function(simple_module)
 
     add_library(${mod} INTERFACE)
     target_link_libraries(${mod} INTERFACE $<TARGET_OBJECTS:${mod}-object> ${mod}-dependencies)
+
+    if(DEFINED prefix_alias AND NOT prefix_alias STREQUAL "")
+        add_library(${prefix_alias}${mod_suffix} ALIAS ${mod})
+    endif()
 endfunction()
 
 function(simple_module_test)

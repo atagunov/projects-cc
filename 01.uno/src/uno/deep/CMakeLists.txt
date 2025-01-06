@@ -1,0 +1,1 @@
+simple_module(gamma.cc)
