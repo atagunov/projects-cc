@@ -34,7 +34,10 @@
 # For an executable we expect "src/main.cc src/x.cc src/x tests/x-test tests/x/..." and no other source files
 #
 # not working: This file includes "src" and "tests" directories once their -I properties have been set
-# not working: "simple_gtest" adds "gtest::gtest" dependency
+# since this feature is not working we get a bit of boilerplate for "src/CMakeLists.txt" and "tests/CMakeLists.txt"
+# these need to specify "include_directories" correctly
+#
+# "simple_gtest" adds "gtest::gtest" dependency
 
 function(simple_module_compute_internals)
     list(POP_FRONT ARGV kind src_file)
