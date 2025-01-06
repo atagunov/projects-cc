@@ -1,0 +1,1 @@
+simple_gtest(util-test.cc)
