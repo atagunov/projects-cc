@@ -39,6 +39,8 @@
 #
 # "simple_gtest" adds "gtest::gtest" dependency
 
+include(GoogleTest)
+
 function(simple_module_compute_internals)
     list(POP_FRONT ARGV kind src_file)
     set(deps ${ARGV})
@@ -84,8 +86,15 @@ function(simple_module_impl)
     add_library(${mod}-object OBJECT ${src_file})
     target_link_libraries(${mod}-object ${mod}-dependencies)
 
+    # it seems a bit awkward that we're adding both "util.cc.o" and "uno-util-object"
+    # as dependencies of "uno" here
+    # however otherwise it's not working with cmake 3.31.3
+    # if we leave out "uno-util-object" it doesn't build "util.cc.o"
+    # if we leave out "util.cc.o" it doesn't link it into the main executable
+    # worth asking on cmake discord?..
+
     add_library(${mod} INTERFACE)
-    target_link_libraries(${mod} INTERFACE $<TARGET_OBJECTS:${mod}-object> ${mod}-dependencies)
+    target_link_libraries(${mod} INTERFACE ${mod}-object ${mod}-dependencies $<TARGET_OBJECTS:${mod}-object>)
 
     if(DEFINED prefix_alias AND NOT prefix_alias STREQUAL "")
         set(fancy_name ${prefix_alias}${mod_suffix})
@@ -115,5 +124,7 @@ function(simple_gtest)
 
     add_executable(${mod}-test ${src_file})
     target_link_libraries(${mod}-test ${mod}-dependencies ${deps})
+
+    gtest_discover_tests(${mod}-test)
 endfunction()
 
