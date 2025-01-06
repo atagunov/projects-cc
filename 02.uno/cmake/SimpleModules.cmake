@@ -15,7 +15,7 @@
 #
 # We provide the following function for including .cc files into the project
 # "simple_module" - for "src/uno/util.cc" (which becomes "uno-util" target, for convenience aliased by "uno::util")
-# "simple_test_module" - for "tests/uno/test-util/fs.cc" (which becomes "uno-test_util-fs" target, aliased by "uno::test_util::fs")
+# "simple_test_helper" - for "tests/uno/test-util/fs.cc" (which becomes "uno-test_util-fs" target, aliased by "uno::test_util::fs")
 # "simple_gtest" - for "tests/uno/util-test.cc" (which becomes "uno-util-test" target, note that here dash is fine, no alias since no need)
 #
 # Each of these functions takes name of .cc file as 1st argument
@@ -39,7 +39,7 @@
 
 include(GoogleTest)
 
-function(simple_module_compute_internals)
+function(_simple_module_compute_internals)
     list(POP_FRONT ARGV kind src_file)
     set(deps ${ARGV})
 
@@ -57,10 +57,10 @@ function(simple_module_compute_internals)
     return(PROPAGATE kind src_file deps mod_prefix prefix_alias)
 endfunction()
 
-function(simple_module_get_submodules mod_suffix)
+function(_simple_module_get_submodules mod_suffix)
     set(submodules, "")
     if(IS_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${mod_suffix})
-        get_property(all DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${mod_suffix} PROPERTY simple_modules_all)
+        get_property(all DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${mod_suffix} PROPERTY _simple_modules_all)
         if(all)
             set(submodules ${all})
         endif()
@@ -68,12 +68,12 @@ function(simple_module_get_submodules mod_suffix)
     return(PROPAGATE submodules)
 endfunction()
 
-function(simple_module_impl)
-    simple_module_compute_internals(${ARGV})
+function(_simple_module_impl)
+    _simple_module_compute_internals(${ARGV})
     string(REGEX REPLACE "\\..*" "" mod_suffix ${src_file})
     set(mod "${mod_prefix}${mod_suffix}")
 
-    simple_module_get_submodules(${mod_suffix})
+    _simple_module_get_submodules(${mod_suffix})
     list(APPEND deps ${submodules})
 
     message("-- simple ${kind} module: ${prefix_alias}${mod_suffix} [${deps}]")
@@ -102,19 +102,19 @@ function(simple_module_impl)
     endif()
 
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} APPEND PROPERTY
-            simple_modules_all ${fancy_name})
+            _simple_modules_all ${fancy_name})
 endfunction()
 
 function(simple_module)
-    simple_module_impl("src" ${ARGV})
+    _simple_module_impl("src" ${ARGV})
 endfunction()
 
-function(simple_test_module)
-    simple_module_impl("tests" ${ARGV})
+function(simple_test_helper)
+    _simple_module_impl("tests" ${ARGV})
 endfunction()
 
 function(simple_gtest)
-    simple_module_compute_internals("tests" ${ARGV})
+    _simple_module_compute_internals("tests" ${ARGV})
     string(REGEX REPLACE "-test\\..*" "" mod_suffix ${src_file})
     set(mod "${mod_prefix}${mod_suffix}")
     list(APPEND deps gtest::gtest)
@@ -138,9 +138,10 @@ add_subdirectory("src")
 # by convention any file in "tests" subfolder can textually #include
 # its counterpart in "src" folder, so includes setup above work very nicely here
 
-# additionally there can be extra "test modules" - auxiliary .cc/.hh pairs doing simple_module
-# helper work shared between different tests under "tests" folder, so we do want the ability
+# additionally there can be extra "test modules" - auxiliary .cc/.hh pairs doing helper work
+# shared between different tests under "tests" folder, so we do want the ability
 # to include from "tests" folder as well
+# these "test modules" are added to the project via simple_test_helper() function
 
 include_directories("tests")
 add_subdirectory("tests")
