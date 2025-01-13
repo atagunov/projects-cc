@@ -53,7 +53,7 @@ int main() {
     jthread tCoop{runCooperative, "coop"};
 
     // supplying rvalue std::string here, it gets moved into on-heap data structure
-    // and then with help from std::move-ed into 2nd parameter of runSimple()
+    // and then with help from std::move into 2nd parameter of runSimple()
     // where const string& binds to it
     // the costs are essentially the same as supplying a const char* above
     jthread tSimple{runSimple, "simple"s};
