@@ -26,7 +26,7 @@ using std::stop_token;
 
 // This function takes its 2nd parameter as const std::string&
 //
-// The values we pass in are short and thanks to "short string optmization"
+// The values we pass in are short and thanks to short string optmization
 // we don't incur any extra dynamic memory allocation
 //
 // If the names were longer we'd be copying them to the heap
