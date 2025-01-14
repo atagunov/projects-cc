@@ -22,6 +22,9 @@
  *
  * Presently all logging is going to the console
  * Logging can be directed to a file using regular Boost log facilities
+ *
+ * "Channel" attribute of the messages being logged presently not used
+ * Can be added to log via regular Boost log facilities
  */
 namespace util::log {
     // could use enum class
@@ -48,7 +51,6 @@ namespace util::log {
         template<typename ...Args>
         void error(const Args&... args) {
             using boost::log::keywords::severity;
-            using boost::stacktrace::stacktrace;
 
             if (auto record = open_record(severity = ERROR)) {
                 record_ostream ros{record};
