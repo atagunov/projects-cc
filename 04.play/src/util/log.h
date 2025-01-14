@@ -1,6 +1,6 @@
 #pragma once
 
-#include <tuple>
+#include <iostream>
 
 #include <boost/log/core.hpp>
 #include <boost/log/attributes.hpp>
@@ -22,50 +22,87 @@
  *
  * Presently all logging is going to the console
  * Logging can be directed to a file using regular Boost log facilities
- *
- * "Channel" attribute of the messages being logged presently not used
- * Can be added to log via regular Boost log facilities
  */
 namespace util::log {
+    // not very elegant that this creates util::log::src namespace but simplifes this file
+    namespace src = boost::log::sources;
+
     // could use enum class
     enum severity_level {
         DEBUG, INFO, WARN, ERROR
     };
 
-    class Logger: public boost::log::sources::severity_logger_mt<severity_level> {
+    std::ostream& operator<<(std::ostream& os, severity_level severity);
+    void _appendCurrentException(boost::log::record_ostream& ros);
+
+    /**
+     * This class is a template so that we can easily procude two versions of
+     * thread-safe (MT) and non-thread-safe
+     */
+    template<typename Threading>
+    class _Logger: public src::basic_composite_logger<char,
+            _Logger<Threading>,
+            Threading, 
+            src::features<src::severity<severity_level>>> {
         using record_ostream = boost::log::record_ostream;
 
-        Logger(std::string channel) {
-            add_attribute("Channel", boost::log::attributes::constant<std::string>{channel});
+        _Logger(std::string channel) {
+            // doesn't resolve add_attribute from parent w/o this->
+            this->add_attribute("Channel", boost::log::attributes::constant<std::string>{channel});
         }
 
-        template<typename T>
-        friend Logger getLogger();
+        template<class Logger, typename T>
+        friend Logger _getLogger();
 
-        void appendCurrentException(record_ostream& ros);
+        template<typename ...Args> void doLog(severity_level severityLevel, const Args&... args) {
+            using boost::log::keywords::severity;
 
+            if (auto record = this->open_record(severity = severityLevel)) {
+                record_ostream ros{record};
+                (ros << ... << args);
+                _appendCurrentException(ros);
+                ros.flush();
+                this->push_record(std::move(record));
+            }
+        }
     public:
         /**
          * Prints error message and info on current exception including stack trace
          */
-        template<typename ...Args>
-        void error(const Args&... args) {
-            using boost::log::keywords::severity;
+        template<typename ...Args> void error(const Args&... args) {
+            doLog(ERROR, args...);
+        }
 
-            if (auto record = open_record(severity = ERROR)) {
-                record_ostream ros{record};
-                (ros << ... << args);
-                appendCurrentException(ros);
-                ros.flush();
-                push_record(std::move(record));
-            }
+        template<typename ...Args> void info(const Args&... args) {
+            doLog(INFO, args...);
         }
     };
 
-    template<typename T> inline
-    Logger getLogger() {
+    /**
+     * MARKER type here identifies a unique logger instance
+     * and defines its name via Boost's pretty_name facility
+     *
+     * This method is not considered as a part of public API of util::log
+     * rather the next method is
+     */
+    template<class L, typename MARKER> inline L _getLogger() {
         // since C++11 executed exactly once
-        static Logger logger{boost::typeindex::type_id<T>().pretty_name()};
+        static L logger{boost::typeindex::type_id<MARKER>().pretty_name()};
         return logger;
     }
+
+    /**
+     * At present we've chosen to make the Logger a multi-threaded class
+     * If we need non-mt class later it will then be called smth like FastLogger
+     *
+     * We could have done it the other way around and made Logger non-thread-safe
+     * and then created separate LoggerMT with its separate getLoggerMt()
+     */
+    using Logger = _Logger<src::multi_thread_model<boost::log::aux::light_rw_mutex>>;
+
+    template <typename T> inline Logger getLogger() {
+        return _getLogger<Logger, T>();
+    }
+
+    void setupSimpleConsoleFormat();
 }

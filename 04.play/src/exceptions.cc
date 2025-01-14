@@ -14,6 +14,7 @@ using util::log::INFO;
 using util::log::ERROR;
 
 namespace some {
+    /** Using a namespace to see "some::TestException" in the log */
     class TestException: public logic_error {
         using logic_error::logic_error;
     };
@@ -45,11 +46,15 @@ namespace {
     }
 }
 
+// marker struct used to identify a globally unique "main" logger
+// any part of the app can call getLogger<main> and get the same logger instance
 struct main{};
 
 int main() {
+    util::log::setupSimpleConsoleFormat();
+
     Logger logger = getLogger<struct main>();
-    BOOST_LOG_SEV(logger, INFO) << "Staring";
+    logger.info("Staring");
 
     try {
         f1();
@@ -57,5 +62,8 @@ int main() {
         // will print current exception too
         logger.error("Error while doing f1");
     }
+
+
+    logger.info("Exiting");
     return 0;
 }

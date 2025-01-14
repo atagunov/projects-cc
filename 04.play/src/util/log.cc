@@ -1,5 +1,16 @@
 #include <util/log.h>
 
+#include <boost/log/common.hpp>
+#include <boost/log/expressions.hpp>
+
+#include <boost/shared_ptr.hpp>
+
+#include <boost/log/utility/setup/console.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
+
+#include <boost/log/expressions/formatters/date_time.hpp>
+#include <boost/log/support/date_time.hpp>
+
 using boost::log::record_ostream;
 
 namespace {
@@ -39,7 +50,7 @@ namespace {
 }
 
 namespace util::log {
-    void Logger::appendCurrentException(record_ostream& ros) {
+    void _appendCurrentException(record_ostream& ros) {
         auto ePtr = std::current_exception();
         if (ePtr) {
             try {
@@ -50,5 +61,50 @@ namespace util::log {
                 appendUnknownExceptionInfo(ros);
             }
         }
+    }
+
+    std::ostream& operator<<(std::ostream& os, severity_level severity) {
+        os << std::invoke([=]{ switch (severity) {
+            case DEBUG: return "DEBUG";
+            case INFO: return "INFO";
+            case WARN: return "WARN";
+            case ERROR: return "ERROR";
+            default: return "UKNWN";
+        }});
+        return os;
+    }
+
+    BOOST_LOG_ATTRIBUTE_KEYWORD(timestamp, "TimeStamp", boost::posix_time::ptime)
+    BOOST_LOG_ATTRIBUTE_KEYWORD(severity, "Severity", severity_level)
+    BOOST_LOG_ATTRIBUTE_KEYWORD(channel, "Channel", std::string)
+
+    void setupSimpleConsoleFormat() {
+        using boost::shared_ptr;
+        using boost::log::core;
+        namespace dans = boost::log::aux::default_attribute_names;
+        namespace kwds = boost::log::keywords;
+        namespace attrs = boost::log::attributes;
+        namespace exprs = boost::log::expressions;
+
+        boost::log::add_common_attributes();
+
+        shared_ptr<core> pCore = core::get();
+        pCore->add_global_attribute(
+            dans::timestamp(),
+            attrs::local_clock());
+
+        pCore->add_global_attribute(
+            dans::thread_id(),
+            attrs::current_thread_id());
+
+        // not successful in outputting severity via text-based format so going for functional style
+        boost::log::add_console_log(std::clog, kwds::format = (
+            exprs::stream
+                << exprs::format_date_time(timestamp, "%Y-%m-%d %H:%M:%S.%f")
+                << " #" << std::setw(5) << std::left
+                << severity << std::setw(0)
+                << " [" << channel << "] "
+                << exprs::smessage
+        ));
     }
 }
