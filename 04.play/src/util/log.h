@@ -2,14 +2,12 @@
 
 #include <iostream>
 
-#include <boost/log/core.hpp>
 #include <boost/log/attributes.hpp>
-#include <boost/log/sources/severity_logger.hpp>
+#include <boost/log/sources/severity_channel_logger.hpp>
 #include <boost/log/sources/record_ostream.hpp>
+#include <boost/log/keywords/channel.hpp>
 
 #include <boost/type_index.hpp>
-
-#include <boost/stacktrace.hpp>
 
 /**
  * Adapter for using boost logging
@@ -39,11 +37,8 @@ namespace util::log {
      * This class is a template so that we can easily procude two versions of
      * thread-safe (MT) and non-thread-safe
      */
-    template<typename Threading>
-    class _Logger: public src::basic_composite_logger<char,
-            _Logger<Threading>,
-            Threading, 
-            src::features<src::severity<severity_level>>> {
+    template<typename Parent>
+    class _Logger: public Parent {
         using record_ostream = boost::log::record_ostream;
 
         _Logger(std::string channel) {
@@ -98,11 +93,11 @@ namespace util::log {
      * We could have done it the other way around and made Logger non-thread-safe
      * and then created separate LoggerMT with its separate getLoggerMt()
      */
-    using Logger = _Logger<src::multi_thread_model<boost::log::aux::light_rw_mutex>>;
+    using Logger = _Logger<src::severity_channel_logger_mt<severity_level>>;
 
     template <typename T> inline Logger getLogger() {
         return _getLogger<Logger, T>();
     }
 
-    void setupSimpleConsoleFormat();
+    void setupSimpleConsoleLogging();
 }

@@ -1,15 +1,15 @@
 #include <util/log.h>
 
-#include <boost/log/common.hpp>
 #include <boost/log/expressions.hpp>
-
-#include <boost/shared_ptr.hpp>
+#include <boost/log/expressions/formatters/date_time.hpp>
+#include <boost/log/support/date_time.hpp>
 
 #include <boost/log/utility/setup/console.hpp>
 #include <boost/log/utility/setup/common_attributes.hpp>
 
-#include <boost/log/expressions/formatters/date_time.hpp>
-#include <boost/log/support/date_time.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/stacktrace.hpp>
+
 
 using boost::log::record_ostream;
 
@@ -78,7 +78,7 @@ namespace util::log {
     BOOST_LOG_ATTRIBUTE_KEYWORD(severity, "Severity", severity_level)
     BOOST_LOG_ATTRIBUTE_KEYWORD(channel, "Channel", std::string)
 
-    void setupSimpleConsoleFormat() {
+    void setupSimpleConsoleLogging() {
         using boost::shared_ptr;
         using boost::log::core;
         namespace dans = boost::log::aux::default_attribute_names;

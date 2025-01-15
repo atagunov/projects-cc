@@ -51,7 +51,7 @@ namespace {
 struct main{};
 
 int main() {
-    util::log::setupSimpleConsoleFormat();
+    util::log::setupSimpleConsoleLogging();
 
     Logger logger = getLogger<struct main>();
     logger.info("Staring");
