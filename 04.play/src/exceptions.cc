@@ -54,7 +54,7 @@ int main() {
     util::log::setupSimpleConsoleLogging();
 
     Logger logger = getLogger<struct main>();
-    logger.info("Staring");
+    logger.info("Starting");
 
     try {
         f1();
