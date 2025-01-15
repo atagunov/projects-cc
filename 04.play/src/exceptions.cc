@@ -59,10 +59,15 @@ int main() {
     try {
         f1();
     } catch (std::exception& e) {
-        // will print current exception too
-        logger.error("Error while doing f1");
+        logger.error("Error while doing f1()", e);
     }
 
+    logger.warn("Round 2");
+    try {
+        f1();
+    } catch (...) {
+        logger.errorWithCurrentException("Something went wrong again doing f1()");
+    }
 
     logger.info("Exiting");
     return 0;

@@ -31,6 +31,8 @@ namespace util::log {
     };
 
     std::ostream& operator<<(std::ostream& os, severity_level severity);
+
+    void _appendException(boost::log::record_ostream& ros, const std::exception& e);
     void _appendCurrentException(boost::log::record_ostream& ros);
 
     /**
@@ -39,21 +41,44 @@ namespace util::log {
      */
     template<typename Parent>
     class _Logger: public Parent {
-        using record_ostream = boost::log::record_ostream;
+        using ros_t = boost::log::record_ostream;
 
-        _Logger(std::string channel) {
-            // doesn't resolve add_attribute from parent w/o this->
-            this->add_attribute("Channel", boost::log::attributes::constant<std::string>{channel});
-        }
+        _Logger(std::string channel): Parent{boost::log::keywords::channel = channel} {}
 
         template<class Logger, typename T>
         friend Logger _getLogger();
 
-        template<typename ...Args> void doLog(severity_level severityLevel, const Args&... args) {
+        template<typename A0, typename ...Args> void _logOneByOne(ros_t& ros,
+                const A0& a0, const Args&... args) {
+            ros << a0;
+            _logOneByOne(ros, args...);
+        }
+
+        template<typename A0> void _logOneByOne(ros_t& ros, const A0& a0) {
+            ros << a0;
+        }
+
+        template<typename E> requires std::is_base_of_v<std::exception, E>
+        void _logOneByOne(ros_t& ros, const E& e) {
+            _appendException(ros, e);
+        }
+
+        template<typename ...Args> void _log(severity_level severityLevel, const Args&... args) {
             using boost::log::keywords::severity;
 
             if (auto record = this->open_record(severity = severityLevel)) {
-                record_ostream ros{record};
+                ros_t ros{record};
+                _logOneByOne(ros, args...);
+                ros.flush();
+                this->push_record(std::move(record));
+            }
+        }
+
+        template<typename ...Args> void _logWithCurrentException(severity_level severityLevel, const Args&... args) {
+            using boost::log::keywords::severity;
+
+            if (auto record = this->open_record(severity = severityLevel)) {
+                ros_t ros{record};
                 (ros << ... << args);
                 _appendCurrentException(ros);
                 ros.flush();
@@ -61,15 +86,32 @@ namespace util::log {
             }
         }
     public:
-        /**
-         * Prints error message and info on current exception including stack trace
-         */
-        template<typename ...Args> void error(const Args&... args) {
-            doLog(ERROR, args...);
+        /** If the last argument passed extends std::exception we shall print stack trace all right */
+        template<typename ...Args> void debug(const Args&... args) {
+            _log(DEBUG, args...);
         }
 
+        /** If the last argument passed extends std::exception we shall print stack trace all right */
         template<typename ...Args> void info(const Args&... args) {
-            doLog(INFO, args...);
+            _log(INFO, args...);
+        }
+
+        /** If the last argument passed extends std::exception we shall print stack trace */
+        template<typename ...Args> void warn(const Args&... args) {
+            _log(WARN, args...);
+        }
+
+        /** If the last argument passed extends std::exception we shall print stack trace */
+        template<typename ...Args> void error(const Args&... args) {
+            _log(ERROR, args...);
+        }
+
+        template<typename ...Args> void warnWithCurrentException(const Args&... args) {
+            _logWithCurrentException(WARN, args...);
+        }
+
+        template<typename ...Args> void errorWithCurrentException(const Args&... args) {
+            _logWithCurrentException(ERROR, args...);
         }
     };
 

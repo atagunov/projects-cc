@@ -41,9 +41,13 @@ namespace {
         }
     }
 
-    void appendStdExceptionInfo(record_ostream& ros, const std::exception& e) {
+    void prettyPrint(record_ostream& ros, const std::exception& e) {
         ros << ": " << boost::typeindex::type_id_runtime(e).pretty_name() << "("
                 << e.what() << ")";
+    }
+
+    void appendStdExceptionInfo(record_ostream& ros, const std::exception& e) {
+        prettyPrint(ros, e);
         appendCurrentExceptionTrace(ros);
         appendNestedExceptions(ros, e);
     }
@@ -60,6 +64,32 @@ namespace util::log {
             } catch (...) {
                 appendUnknownExceptionInfo(ros);
             }
+        }
+    }
+
+    void _appendException(record_ostream& ros, const std::exception& e) {
+        // let us see if the current exception matches e, then we can report current exception's stack trace
+        auto ePtr = std::current_exception();
+        if (!ePtr) {
+            // wow, it's not the same, we don't have the stack trace (unless it's a special boost exception which has it..)
+            // for now we'll treat it as not having a stack trace
+            prettyPrint(ros, e);
+            return;
+        }
+
+        try {
+            std::rethrow_exception(ePtr);
+        } catch (const std::exception& e2) {
+            // using std::addressof feels like an overkill, let's do it C++98 style :)
+            if (&e == &e2) {
+                // bingo, what we wanted
+                appendStdExceptionInfo(ros, e);
+            } else {
+                /* ouch we have been asked to print e not e2 */
+                prettyPrint(ros, e);
+            }
+        } catch (...) {
+            appendUnknownExceptionInfo(ros);
         }
     }
 
