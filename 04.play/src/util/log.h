@@ -115,6 +115,10 @@ namespace util::log {
         template<typename ...Args> void errorWithCurrentException(const Args&... args) {
             _logWithCurrentException(ERROR, args...);
         }
+
+        /* Instances of _Logger can actually be copied but we want all usage to go via getLogger() */
+        _Logger(const _Logger&) = delete;
+        _Logger& operator= (const _Logger&) = delete;
     };
 
     /**

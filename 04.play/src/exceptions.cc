@@ -53,7 +53,7 @@ struct main{};
 int main() {
     util::log::setupSimpleConsoleLogging();
 
-    Logger logger = getLogger<struct main>();
+    Logger& logger = getLogger<struct main>();
     logger.info("Starting");
 
     try {
