@@ -80,16 +80,17 @@ namespace util::log {
         try {
             std::rethrow_exception(ePtr);
         } catch (const std::exception& e2) {
-            // using std::addressof feels like an overkill, let's do it C++98 style :)
+            /* comparing addresses seems like the best option we have */
             if (&e == &e2) {
                 // bingo, what we wanted
                 appendStdExceptionInfo(ros, e);
             } else {
-                /* ouch we have been asked to print e not e2 */
+                // ouch we have been asked to print e not e2
                 prettyPrint(ros, e);
             }
         } catch (...) {
-            appendUnknownExceptionInfo(ros);
+            // another ouch, current is definitely different from 3 and we have been asked to print e
+            prettyPrint(ros, e);
         }
     }
 
