@@ -80,7 +80,7 @@ namespace util::log {
         try {
             std::rethrow_exception(ePtr);
         } catch (const std::exception& e2) {
-            /* comparing addresses seems like the best option we have */
+            // comparing addresses seems like the best option we have
             if (&e == &e2) {
                 // bingo, what we wanted
                 appendStdExceptionInfo(ros, e);
@@ -89,7 +89,7 @@ namespace util::log {
                 prettyPrint(ros, e);
             }
         } catch (...) {
-            // another ouch, current is definitely different from 3 and we have been asked to print e
+            // another ouch, current is definitely different from e and we have been asked to print e
             prettyPrint(ros, e);
         }
     }
