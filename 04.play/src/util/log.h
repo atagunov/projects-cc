@@ -38,15 +38,17 @@ namespace util::log {
     /**
      * This class is a template so that we can easily procude two versions of
      * thread-safe (MT) and non-thread-safe
-     */
+     *
+     * Open question: could we have a more elegant design if we used BOOST_LOG_DECLARE_LOGGER_TYPE macro?
+      */
     template<typename Parent>
     class _Logger: public Parent {
         using ros_t = boost::log::record_ostream;
 
         _Logger(std::string channel): Parent{boost::log::keywords::channel = channel} {}
 
-        template<class Logger, typename T>
-        friend Logger _getLogger();
+        template<class Logger, typename MARKER>
+        friend Logger& _getLogger();
 
         template<typename A0, typename ...Args> void _logOneByOne(ros_t& ros,
                 const A0& a0, const Args&... args) {
@@ -122,7 +124,7 @@ namespace util::log {
      * This method is not considered as a part of public API of util::log
      * rather the next method is
      */
-    template<class L, typename MARKER> inline L _getLogger() {
+    template<class L, typename MARKER> inline L& _getLogger() {
         // since C++11 executed exactly once
         static L logger{boost::typeindex::type_id<MARKER>().pretty_name()};
         return logger;
@@ -137,7 +139,7 @@ namespace util::log {
      */
     using Logger = _Logger<src::severity_channel_logger_mt<severity_level>>;
 
-    template <typename T> inline Logger getLogger() {
+    template <typename T> inline Logger& getLogger() {
         return _getLogger<Logger, T>();
     }
 
