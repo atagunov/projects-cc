@@ -1,5 +1,6 @@
 #pragma once
 
+#include <util/args_magic.h>
 #include <iostream>
 
 #include <boost/log/attributes.hpp>
@@ -34,7 +35,7 @@ namespace util::log {
      * thread-safe (MT) and non-thread-safe
      *
      * Open question: could we have a more elegant design if we used BOOST_LOG_DECLARE_LOGGER_TYPE macro?
-      */
+     */
     template<typename Parent>
     class _Logger: public Parent {
         using ros_t = boost::log::record_ostream;
@@ -44,12 +45,7 @@ namespace util::log {
         template<class Logger, typename MARKER>
         friend Logger& _getLogger();
 
-        /*
-         * This is the 1st way to determine that the last arg passed is an exception
-         * Alternative solution based on a recursive template commented out bellow
-        */
-
-        /** Helper function, invoked when last arg is of a class extending std::exception */
+        /** Helper function, is invoked when last arg pass to _log extends std::exception */
         template<typename ...Args, std::size_t ...Is>
         void _logExc(severity_level severityLevel, const std::tuple<Args...>& tup, std::index_sequence<Is...>) {
             using boost::log::keywords::severity;
