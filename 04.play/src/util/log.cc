@@ -47,7 +47,8 @@ namespace {
             ros << std::endl;
             std::for_each(begin(trace), r1.base(), [&ros, level](auto&& frame){
                 appendLevel(ros, level);
-                ros << frame; ros << std::endl;
+                ros << frame;
+                ros << std::endl;
             });
 
             return std::move(trace);
