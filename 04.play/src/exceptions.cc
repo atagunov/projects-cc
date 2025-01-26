@@ -62,12 +62,14 @@ int main() {
         logger.error("Error while doing f1()", e);
     }
 
-    logger.warn("Round 2");
+    /*logger.warn("Round 2");
     try {
         f1();
     } catch (...) {
         logger.errorWithCurrentException("Something went wrong again doing f1()");
-    }
+    }*/
+
+    throw some::TestException("from-main");
 
     logger.info("Exiting");
     return 0;

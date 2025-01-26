@@ -1,5 +1,8 @@
 #include <util/log.h>
 
+#include <iterator>
+#include <ranges>
+
 #include <boost/log/expressions.hpp>
 #include <boost/log/expressions/formatters/date_time.hpp>
 #include <boost/log/support/date_time.hpp>
@@ -14,30 +17,66 @@
 using boost::log::record_ostream;
 
 namespace {
-    void appendCurrentExceptionTrace(record_ostream& ros) {
-        using boost::stacktrace::stacktrace;
+    using boost::stacktrace::stacktrace;
 
-        auto trace = stacktrace::from_current_exception();
-        if (trace) {
-            ros << std::endl << trace;
+    void appendLevel(record_ostream& ros, int level) {
+        for (int i = 0; i < level; ++i) {
+            ros << "  ";
         }
     }
 
-    void appendUnknownExceptionInfo(record_ostream& ros) {
-        ros << "unknown exception type";
-        appendCurrentExceptionTrace(ros);
+    void doAppendTrace(record_ostream&ros, int level, auto start, auto stop) {
+        ros << std::endl;
+        std::for_each(start, stop, [&ros, level](auto&& frame){
+            appendLevel(ros, level);
+            ros << frame; ros << std::endl;
+        });
     }
 
-    void appendStdExceptionInfo(record_ostream& ros, const std::exception& e);
+    /** We take 'prev' by rvalue reference to highlight the fact we may move out of it */
+    stacktrace appendCurrentExceptionTrace(record_ostream& ros, int level, stacktrace&& prev) {
+        //std::cout << "prev=";
+        //std::for_each(begin(prev), end(prev), [](auto frame){std::cout << frame.address() << std::endl;});
+        //std::cout << std::endl << std::endl;
+        auto trace = stacktrace::from_current_exception();
+        if (trace) {
+            auto traceREnd = rend(trace);
+            auto proj = [](boost::stacktrace::frame frame){return frame.address();};
+            auto [r1, r2] = std::ranges::mismatch(rbegin(trace), traceREnd, rbegin(prev), rend(prev),
+                    std::ranges::equal_to{}, proj, proj);
 
-    void appendNestedExceptions(record_ostream& ros, const std::exception& e) {
+            ros << std::endl;
+            std::for_each(begin(trace), r1.base(), [&ros, level](auto&& frame){
+                appendLevel(ros, level);
+                ros << frame; ros << std::endl;
+            });
+
+            return std::move(trace);
+        }
+
+        /* strange we got here but let's use prev stacktrace for diffs; and this disables RVO, sadly */
+        return std::move(prev);
+    }
+
+    void appendUnknownExceptionInfo(record_ostream& ros, int level,
+            stacktrace&& prev) {
+        ros << "unknown exception type";
+        appendCurrentExceptionTrace(ros, level, std::move(prev));
+    }
+
+    void appendStdExceptionInfo(record_ostream& ros, const std::exception& e, int level,
+            stacktrace&& prev);
+
+    void appendNestedExceptions(record_ostream& ros, const std::exception& e, int level,
+            stacktrace&& prev) {
         try {
             std::rethrow_if_nested(e);
         } catch (const std::exception& nested) {
-            ros << "  caused by";
-            appendStdExceptionInfo(ros, nested);
+            appendLevel(ros, level);
+            ros << "caused by";
+            appendStdExceptionInfo(ros, nested, level + 1, std::move(prev));
         } catch (...) {
-            appendUnknownExceptionInfo(ros);
+            appendUnknownExceptionInfo(ros, level + 1, std::move(prev));
         }
     }
 
@@ -46,10 +85,23 @@ namespace {
                 << e.what() << ")";
     }
 
-    void appendStdExceptionInfo(record_ostream& ros, const std::exception& e) {
+    void appendStdExceptionInfo(record_ostream& ros, const std::exception& e, int level,
+            stacktrace&& prev) {
         prettyPrint(ros, e);
-        appendCurrentExceptionTrace(ros);
-        appendNestedExceptions(ros, e);
+        stacktrace current = appendCurrentExceptionTrace(ros, level, std::move(prev));
+        appendNestedExceptions(ros, e, level, std::move(current));
+    }
+}
+
+namespace util::log {
+    struct handle_terminate_log{};
+}
+
+namespace {
+    void handleTerminate() {
+        util::log::getLogger<struct util::log::handle_terminate_log>().errorWithCurrentException(
+            "Application being terminated");
+        std::abort();
     }
 }
 
@@ -60,9 +112,9 @@ namespace util::log {
             try {
                 std::rethrow_exception(ePtr);
             } catch (const std::exception& e) {
-                appendStdExceptionInfo(ros, e);
+                appendStdExceptionInfo(ros, e, 1, stacktrace{});
             } catch (...) {
-                appendUnknownExceptionInfo(ros);
+                appendUnknownExceptionInfo(ros, 1, stacktrace{});
             }
         }
     }
@@ -71,8 +123,11 @@ namespace util::log {
         // let us see if the current exception matches e, then we can report current exception's stack trace
         auto ePtr = std::current_exception();
         if (!ePtr) {
-            // wow, it's not the same, we don't have the stack trace (unless it's a special boost exception which has it..)
-            // for now we'll treat it as not having a stack trace
+            // looks like we have been invoked outside a catch block
+            // so we cannot use stack walking to print a stack trace
+            // let us just print exception info on the exception passed in as 'e'
+            // possible future enhancement: use boost facilities for capturing exception stack trace in exception
+            // rather than boost facilities for waling stack trace of the currently handled exception
             prettyPrint(ros, e);
             return;
         }
@@ -82,14 +137,18 @@ namespace util::log {
         } catch (const std::exception& e2) {
             // comparing addresses seems like the best option we have
             if (&e == &e2) {
-                // bingo, what we wanted
-                appendStdExceptionInfo(ros, e);
+                // bingo, expected use case: we have been passed exactly the same exception
+                // as is currently being processed
+                appendStdExceptionInfo(ros, e, 1, stacktrace{});
             } else {
-                // ouch we have been asked to print e not e2
+                // not the expected use case; we have been passed not the exception that is currently processed
+                // let us fall back to just priting info on the exception explicitly passed in
                 prettyPrint(ros, e);
             }
         } catch (...) {
-            // another ouch, current is definitely different from e and we have been asked to print e
+            // not the expected use case; currently processed exception is not derived from std::exception
+            // but we have been passed e which is derived..
+            // let us fall back to just priting info on the exception explicitly passed in
             prettyPrint(ros, e);
         }
     }
@@ -137,5 +196,7 @@ namespace util::log {
                 << " [" << channel << "] "
                 << exprs::smessage
         ));
+
+        std::set_terminate(handleTerminate);
     }
 }

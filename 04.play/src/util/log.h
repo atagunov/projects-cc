@@ -12,12 +12,6 @@
 /**
  * Adapter for using boost logging
  *
- * TODO: stack traces printed do not show where currently executing frame is
- * making it harder to read the log
- *
- * TODO: shift stack trace items further to the right to make stack
- * traces easier to read
- *
  * Presently all logging is going to the console
  * Logging can be directed to a file using regular Boost log facilities
  */
@@ -50,7 +44,44 @@ namespace util::log {
         template<class Logger, typename MARKER>
         friend Logger& _getLogger();
 
-        template<typename A0, typename ...Args> void _logOneByOne(ros_t& ros,
+        /** This 1st way to determine that last arg passed is an exception: __logExc */
+
+        /** Helper function, invoked when last arg is of a class extending std::exception */
+        template<typename ...Args, std::size_t ...Is>
+        void _logExc(severity_level severityLevel, const std::tuple<Args...>& tup, std::index_sequence<Is...>) {
+            using boost::log::keywords::severity;
+
+            if (auto record = this->open_record(severity = severityLevel)) {
+                ros_t ros{record};
+                ((ros << std::get<Is>(tup)),...);
+                _appendException(ros, std::get<sizeof...(Args) - 1>(tup));
+                this->push_record(std::move(record));
+            }
+        }
+
+        /** This version will get used if last arg is an exception */
+        template<typename ...Args>
+        requires (sizeof...(Args) > 0) && std::is_base_of_v<std::exception,
+                typename std::tuple_element<sizeof...(Args) - 1, std::tuple<Args...>>::type>
+        void _log(severity_level severityLevel, const Args&... args) {
+            _logExc(severityLevel, std::tie(args...),
+                    std::make_index_sequence<sizeof...(Args) - 1>{});
+        }
+
+        /** This version will get used if last arg is not an exception of if there are no args */
+        template<typename ...Args>
+        void _log(severity_level severityLevel, const Args&... args) {
+            using boost::log::keywords::severity;
+
+            if (auto record = this->open_record(severity = severityLevel)) {
+                ros_t ros{record};
+                (ros << ... << args);
+                this->push_record(std::move(record));
+            }
+        }
+
+        /* This is another way to determine that last arg passed is an exception - via a recursive template */
+        /*template<typename A0, typename ...Args> void _logOneByOne(ros_t& ros,
                 const A0& a0, const Args&... args) {
             ros << a0;
             _logOneByOne(ros, args...);
@@ -74,7 +105,7 @@ namespace util::log {
                 ros.flush();
                 this->push_record(std::move(record));
             }
-        }
+        }*/
 
         template<typename ...Args> void _logWithCurrentException(severity_level severityLevel, const Args&... args) {
             using boost::log::keywords::severity;
@@ -96,11 +127,8 @@ namespace util::log {
         /** If the last argument passed extends std::exception we shall print stack trace all right */
         template<typename ...Args> void info(const Args&... args) {
             _log(INFO, args...);
-        }
-
-        /** If the last argument passed extends std::exception we shall print stack trace */
-        template<typename ...Args> void warn(const Args&... args) {
-            _log(WARN, args...);
+        }    struct handle_terminate_log{};
+gs...);
         }
 
         /** If the last argument passed extends std::exception we shall print stack trace */
