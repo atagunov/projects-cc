@@ -44,7 +44,10 @@ namespace util::log {
         template<class Logger, typename MARKER>
         friend Logger& _getLogger();
 
-        /** This 1st way to determine that last arg passed is an exception: __logExc */
+        /*
+         * This is the 1st way to determine that the last arg passed is an exception
+         * Alternative solution based on a recursive template commented out bellow
+        */
 
         /** Helper function, invoked when last arg is of a class extending std::exception */
         template<typename ...Args, std::size_t ...Is>
