@@ -40,9 +40,8 @@ namespace {
         //std::cout << std::endl << std::endl;
         auto trace = stacktrace::from_current_exception();
         if (trace) {
-            auto traceREnd = rend(trace);
             auto proj = [](boost::stacktrace::frame frame){return frame.address();};
-            auto [r1, r2] = std::ranges::mismatch(rbegin(trace), traceREnd, rbegin(prev), rend(prev),
+            auto [r1, r2] = std::ranges::mismatch(rbegin(trace), rend(trace), rbegin(prev), rend(prev),
                     std::ranges::equal_to{}, proj, proj);
 
             ros << std::endl;
