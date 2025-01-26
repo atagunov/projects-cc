@@ -130,8 +130,11 @@ namespace util::log {
         /** If the last argument passed extends std::exception we shall print stack trace all right */
         template<typename ...Args> void info(const Args&... args) {
             _log(INFO, args...);
-        }    struct handle_terminate_log{};
-gs...);
+        }
+
+        /** If the last argument passed extends std::exception we shall print stack trace */
+        template<typename ...Args> void warn(const Args&... args) {
+            _log(WARN, args...);
         }
 
         /** If the last argument passed extends std::exception we shall print stack trace */
