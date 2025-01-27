@@ -15,6 +15,8 @@
  *
  * Presently all logging is going to the console
  * Logging can be directed to a file using regular Boost log facilities
+ *
+ * When passing arguments to std::format all values after format string go in as const& - seems good enough for now
  */
 namespace util::log {
     // not very elegant that this creates util::log::src namespace but simplifes this file
@@ -46,7 +48,7 @@ namespace util::log {
                 return exc;
             }
 
-            template <typename... Prefixes> using FormatStringT = std::format_string<Prefixes...>;
+            template <typename... Prefixes> using FormatStringT = std::format_string<const Prefixes&...>;
             template <typename... Prefixes> static void print(boost::log::record_ostream& ros,
                     FormatStringT<Prefixes...> fmt, const Prefixes&... prefixes, const Exc&) {
                 std::print(ros.stream(), fmt, prefixes...);
@@ -77,12 +79,10 @@ namespace util::log {
              */
             template <typename... Prefixes> static void print(boost::log::record_ostream& ros,
                     FormatStringT<Prefixes...> fmt, const Prefixes&... prefixes, const T& t, const Rest&... rest) {
-                FormatHelper<Rest...>::print(ros, prefixes..., t, rest...);
+                FormatHelper<Rest...>::template print<Prefixes..., T>(ros, fmt, prefixes..., t, rest...);
             }
         };
     }
-
-template <typename Arg> struct PrintMe;
 
     /**
      * This class is a template so that we can easily procude two versions of
@@ -101,8 +101,7 @@ template <typename Arg> struct PrintMe;
 
         /** This version will get used if last arg is an exception */
         template<typename ...Args>
-        requires _detail::EndsInException<Args...>
-        void _log(severity_level severityLevel,
+        void _logExc(severity_level severityLevel,
                 _detail::FormatHelper<Args...>::template FormatStringT<> fmt,
                 const Args&... args) {
             using boost::log::keywords::severity;
@@ -117,7 +116,7 @@ template <typename Arg> struct PrintMe;
 
         /** This version will get used if last arg is not an exception of if there are no args */
         template<typename ...Args>
-        void _log(severity_level severityLevel, std::format_string<Args...> fmt, const Args&... args) {
+        void _log(severity_level severityLevel, std::format_string<const Args&...> fmt, const Args&... args) {
             using boost::log::keywords::severity;
 
             if (auto record = this->open_record(severity = severityLevel)) {
@@ -143,56 +142,56 @@ template <typename Arg> struct PrintMe;
         template<typename ...Args>
         requires _detail::EndsInException<Args...>
         void debug(_detail::FormatHelper<Args...>::template FormatStringT<> fmt, const Args&... args) {
-            _log(DEBUG, fmt, args...);
+            _logExc(DEBUG, fmt, args...);
         }
 
         template<typename ...Args>
         requires (!_detail::EndsInException<Args...>) // selects wrong template without this
-        void debug(std::format_string<Args...> fmt, const Args&... args) {
+        void debug(std::format_string<const Args&...> fmt, const Args&... args) {
             _log(DEBUG, fmt, args...);
         }
 
         template<typename ...Args>
         requires _detail::EndsInException<Args...>
         void info(_detail::FormatHelper<Args...>::template FormatStringT<> fmt, const Args&... args) {
-            _log(INFO, fmt, args...);
+            _logExc(INFO, fmt, args...);
         }
 
         template<typename ...Args>
         requires (!_detail::EndsInException<Args...>) // selects wrong template without this
-        void info(std::format_string<Args...> fmt, const Args&... args) {
+        void info(std::format_string<const Args&...> fmt, const Args&... args) {
             _log(INFO, fmt, args...);
         }
 
         template<typename ...Args>
         requires _detail::EndsInException<Args...>
         void warn(_detail::FormatHelper<Args...>::template FormatStringT<> fmt, const Args&... args) {
-            _log(WARN, fmt, args...);
+            _logExc(WARN, fmt, args...);
         }
 
         template<typename ...Args>
         requires (!_detail::EndsInException<Args...>) // selects wrong template without this
-        void warn(std::format_string<Args...> fmt, const Args&... args) {
+        void warn(std::format_string<const Args&...> fmt, const Args&... args) {
             _log(WARN, fmt, args...);
         }
 
         template<typename ...Args>
         requires _detail::EndsInException<Args...>
         void error(_detail::FormatHelper<Args...>::template FormatStringT<> fmt, const Args&... args) {
-            _log(ERROR, fmt, args...);
+            _logExc(ERROR, fmt, args...);
         }
 
         template<typename ...Args>
         requires (!_detail::EndsInException<Args...>) // selects wrong template without this
-        void error(std::format_string<Args...> fmt, const Args&... args) {
+        void error(std::format_string<const Args&...> fmt, const Args&... args) {
             _log(ERROR, fmt, args...);
         }
 
-        template<typename ...Args> void warnWithCurrentException(std::format_string<Args...> fmt, const Args&... args) {
+        template<typename ...Args> void warnWithCurrentException(std::format_string<const Args&...> fmt, const Args&... args) {
             _logWithCurrentException(WARN, fmt, args...);
         }
 
-        template<typename ...Args> void errorWithCurrentException(std::format_string<Args...> fmt, const Args&... args) {
+        template<typename ...Args> void errorWithCurrentException(std::format_string<const Args&...> fmt, const Args&... args) {
             _logWithCurrentException(ERROR, fmt, args...);
         }
 

@@ -54,12 +54,12 @@ int main() {
     util::log::setupSimpleConsoleLogging();
 
     Logger& logger = getLogger<struct main>();
-    logger.info("Starting");
+    logger.info("Starting; here's an int/float/long to check formatting: {}/{}/{}", 18, 1.0f, 1000l);
 
     try {
         f1();
     } catch (std::exception& e) {
-        logger.error("Error while doing f1()", e);
+        logger.error("Error while doing - here's a float {} and a boolean {} to test formatting - f1()", 3.14f, false, e);
     }
 
     /*logger.warn("Round 2");
