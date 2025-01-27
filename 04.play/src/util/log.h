@@ -38,7 +38,7 @@ namespace util::log {
         concept EndsInException = (sizeof...(Args) > 0) && std::is_base_of_v<std::exception,
                 typename std::tuple_element<sizeof...(Args) - 1, std::tuple<Args...>>::type>;
 
-        /** Class providing , LastType, but() and last() */
+        /** Class providing FormatStrintT<>, print<>() and getExc() */
         template <typename... Args> struct FormatHelper;
 
         /** Base case of template recursion */
@@ -88,7 +88,7 @@ namespace util::log {
      * This class is a template so that we can easily procude two versions of
      * thread-safe (MT) and non-thread-safe
      *
-     * Open question: could we have a more elegant design if we used BOOST_LOG_DECLARE_LOGGER_TYPE macro?
+     * We possibly could have had a more elegant design if we used BOOST_LOG_DECLARE_LOGGER_TYPE macro
      */
     template<typename Parent>
     class _Logger: public Parent {
