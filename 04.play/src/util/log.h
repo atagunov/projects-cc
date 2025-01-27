@@ -82,6 +82,28 @@ namespace util::log {
                 FormatHelper<Rest...>::template print<Prefixes..., T>(ros, fmt, prefixes..., t, rest...);
             }
         };
+
+        /**
+         * MARKER type here identifies a unique logger instance
+         * and defines its name via Boost's pretty_name facility
+         *
+         * This method is not considered as a part of public API of util::log
+         * rather the next method is
+         */
+        template<class T, typename MARKER> inline T& _getSingleton() {
+            // since C++11 executed exactly once
+            static T t{boost::typeindex::type_id<MARKER>().pretty_name()};
+            return t;
+        }
+
+        /**
+         * MARKER type here identifies a unique logger instance
+         */
+        template<class T, typename MARKER> inline T& _getThreadLocal() {
+            // since C++11 executed exactly once
+            thread_local T t{boost::typeindex::type_id<MARKER>().pretty_name()};
+            return t;
+        }
     }
 
     /**
@@ -96,8 +118,11 @@ namespace util::log {
 
         _Logger(std::string channel): Parent{boost::log::keywords::channel = channel} {}
 
-        template<class Logger, typename MARKER>
-        friend Logger& _getLogger();
+        template<class T, typename MARKER>
+        friend T& _detail::_getSingleton();
+
+        template<class T, typename MARKER>
+        friend T& _detail::_getThreadLocal();
 
         /** This version will get used if last arg is an exception */
         template<typename ...Args>
@@ -201,19 +226,6 @@ namespace util::log {
     };
 
     /**
-     * MARKER type here identifies a unique logger instance
-     * and defines its name via Boost's pretty_name facility
-     *
-     * This method is not considered as a part of public API of util::log
-     * rather the next method is
-     */
-    template<class L, typename MARKER> inline L& _getLogger() {
-        // since C++11 executed exactly once
-        static L logger{boost::typeindex::type_id<MARKER>().pretty_name()};
-        return logger;
-    }
-
-    /**
      * At present we've chosen to make the Logger a multi-threaded class
      * If we need non-mt class later it will then be called smth like FastLogger
      *
@@ -222,9 +234,21 @@ namespace util::log {
      */
     using Logger = _Logger<src::severity_channel_logger_mt<severity_level>>;
 
-    template <typename T> inline Logger& getLogger() {
-        return _getLogger<Logger, T>();
+    /** Thread-local */
+    using LoggerTL = _Logger<src::severity_channel_logger<severity_level>>;
+
+    template <typename MARKER> inline auto getLogger() -> Logger& {
+        return _detail::_getSingleton<Logger, MARKER>();
     }
 
-    void setupSimpleConsoleLogging();
+    template <typename MARKER> inline auto getLoggerTL() -> LoggerTL& {
+        return _detail::_getThreadLocal<LoggerTL, MARKER>();
+    }
+
+    /**
+     * If suppressStackTracesAboveHere is true we assume that we have been called from main
+     * and we mark address one level above that so that we don't print the part of the stack
+     * trace that doesn't belong to main anymore and belongs say to libc
+     */
+    void setupSimpleConsoleLogging(bool suppressStackTracesAboveHere);
 }

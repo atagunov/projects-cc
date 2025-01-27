@@ -2,6 +2,7 @@
 
 #include <iterator>
 #include <ranges>
+#include <atomic>
 
 #include <boost/log/expressions.hpp>
 #include <boost/log/expressions/formatters/date_time.hpp>
@@ -19,18 +20,49 @@ using boost::log::record_ostream;
 namespace {
     using boost::stacktrace::stacktrace;
 
+    /**
+     * We may record address of the stackframe above main, in libc here
+     * so that we don't print stack traces above this point
+     *
+     * Logging works correctly even if this has its default value of nullptr
+     *
+     * This variable will be set in a call from main() so if code doing static initialization runs before main
+     * we may well be asked to log an exception while this is still nullptr; this is okay
+     *
+     * The value is wrapped into std::atomic from abundance of caution
+     *
+     * Indeed it is theoretically possible that a static initializer will start another thread before this variable is set in main()
+     * In that case we want to make sure that either nullptr or correct frame address is read from this variable
+     *
+     * In practice this will be the case on x86 platform but to make this intent very explicit we do an std::atomic read and write
+     * with relaxed memory ordering
+     */
+    std::atomic<boost::stacktrace::detail::native_frame_ptr_t> stopTracesHere;
+
     void appendLevel(record_ostream& ros, int level) {
         for (int i = 0; i < level; ++i) {
-            ros << "  ";
+            ros << '\t';
         }
     }
 
-    void doAppendTrace(record_ostream&ros, int level, auto start, auto stop) {
-        ros << std::endl;
-        std::for_each(start, stop, [&ros, level](auto&& frame){
+    /**
+     * @return false if we hit stopTracesHere and no further printing necessary; otherwise true to indicate further printing may be necessary
+     */
+    auto appendStackFrames(record_ostream& ros, auto ptr, auto stop, int level) {
+        auto blocker = stopTracesHere.load(std::memory_order_relaxed);
+
+        for (; ptr != stop; ++ptr) {
+            if (ptr->address() == blocker) {
+                return false;
+            }
+
             appendLevel(ros, level);
-            ros << frame; ros << std::endl;
-        });
+            ros << "at ";
+            ros << *ptr;
+            ros << std::endl;
+        }
+
+        return true;
     }
 
     /** We take 'prev' by rvalue reference to highlight the fact we may move out of it */
@@ -45,11 +77,20 @@ namespace {
                     std::ranges::equal_to{}, proj, proj);
 
             ros << std::endl;
-            std::for_each(begin(trace), r1.base(), [&ros, level](auto&& frame){
+            auto midPoint = r1.base();
+            auto fullStop = end(trace);
+
+            // we have printed until the point this stack trace started matching prev stack trace
+            // only if we're on level 1 which is our 1st level - we don't have level 0 - then we shall
+            // print the rest of stack too, but not beyond stopTracesHere
+            // we additionally want to avoid pritning "caught-here" line if there are no more stack frames to print
+            // e.g. we're already at the end of the trace or the next frame matches stopTracesHere
+            if (appendStackFrames(ros, begin(trace), midPoint, level) && level == 1 && midPoint != fullStop
+                    && midPoint->address() != stopTracesHere.load(std::memory_order_relaxed)) {
                 appendLevel(ros, level);
-                ros << frame;
-                ros << std::endl;
-            });
+                ros << "--caught here--" << std::endl;
+                appendStackFrames(ros, midPoint, fullStop, level);
+            }
 
             return std::move(trace);
         }
@@ -168,7 +209,14 @@ namespace util::log {
     BOOST_LOG_ATTRIBUTE_KEYWORD(severity, "Severity", severity_level)
     BOOST_LOG_ATTRIBUTE_KEYWORD(channel, "Channel", std::string)
 
-    void setupSimpleConsoleLogging() {
+    void setupSimpleConsoleLogging(bool suppressStackTracesAboveHere) {
+        if (suppressStackTracesAboveHere) {
+            stacktrace trace{2, 1};
+            if (!trace.empty()) {
+                stopTracesHere.store(trace[0].address(), std::memory_order_relaxed);
+            }
+        }
+
         using boost::shared_ptr;
         using boost::log::core;
         namespace dans = boost::log::aux::default_attribute_names;
