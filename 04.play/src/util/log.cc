@@ -65,8 +65,12 @@ namespace {
         return true;
     }
 
-    /** We take 'prev' by rvalue reference to highlight the fact we may move out of it */
-    stacktrace appendCurrentExceptionTrace(record_ostream& ros, int level, stacktrace&& prev) {
+    /**
+     * We take 'prev' by value since we assume that moving is cheap and at call site we make sure to std::move
+     * In other methods which just pass through this object to us we take by && (rvalue reference)
+     * to ensure we don't fortet that std::move when invoking them
+     */
+    stacktrace appendCurrentExceptionTrace(record_ostream& ros, int level, stacktrace prev) {
         //std::cout << "prev=";
         //std::for_each(begin(prev), end(prev), [](auto frame){std::cout << frame.address() << std::endl;});
         //std::cout << std::endl << std::endl;
@@ -83,7 +87,7 @@ namespace {
             // we have printed until the point this stack trace started matching prev stack trace
             // only if we're on level 1 which is our 1st level - we don't have level 0 - then we shall
             // print the rest of stack too, but not beyond stopTracesHere
-            // we additionally want to avoid pritning "caught-here" line if there are no more stack frames to print
+            // we additionally want to avoid printing "caught-here" line if there are no more stack frames to print
             // e.g. we're already at the end of the trace or the next frame matches stopTracesHere
             if (appendStackFrames(ros, begin(trace), midPoint, level) && level == 1 && midPoint != fullStop
                     && midPoint->address() != stopTracesHere.load(std::memory_order_relaxed)) {
