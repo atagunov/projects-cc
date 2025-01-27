@@ -1,7 +1,7 @@
 #pragma once
 
-#include <util/args_magic.h>
 #include <iostream>
+#include <print>
 
 #include <boost/log/attributes.hpp>
 #include <boost/log/sources/severity_channel_logger.hpp>
@@ -30,6 +30,60 @@ namespace util::log {
     void _appendException(boost::log::record_ostream& ros, const std::exception& e);
     void _appendCurrentException(boost::log::record_ostream& ros);
 
+    namespace _detail {
+        /** Concept checking if the last type in Args... has std::exception as base class */
+        template <typename... Args>
+        concept EndsInException = (sizeof...(Args) > 0) && std::is_base_of_v<std::exception,
+                typename std::tuple_element<sizeof...(Args) - 1, std::tuple<Args...>>::type>;
+
+        /** Class providing , LastType, but() and last() */
+        template <typename... Args> struct FormatHelper;
+
+        /** Base case of template recursion */
+        template <typename Exc> struct FormatHelper<Exc> {
+            using ExcT = Exc;
+            static const ExcT& getExc(const Exc& exc) {
+                return exc;
+            }
+
+            template <typename... Prefixes> using FormatStringT = std::format_string<Prefixes...>;
+            template <typename... Prefixes> static void print(boost::log::record_ostream& ros,
+                    FormatStringT<Prefixes...> fmt, const Prefixes&... prefixes, const Exc&) {
+                std::print(ros.stream(), fmt, prefixes...);
+            }
+        };
+
+        /** Recursive case */
+        template <typename T, typename... Rest> struct FormatHelper<T, Rest...> {
+            using ExcT = FormatHelper<Rest...>::ExcT;
+            static const ExcT& getExc(const T& t, const Rest&... rest) {
+                return FormatHelper<Rest...>::getExc(rest...);
+            }
+
+            /**
+             * Builds format_string type out of any types from
+             * - upper levels of recursion (Prefixes...)
+             * - curren tlevel of recursion (T)
+             * - lower levels of recursion (Rest...) - except trailing ExcT is excluded
+             */
+            template <typename... Prefixes> using FormatStringT = FormatHelper<Rest...>::template
+                    FormatStringT<Prefixes..., T>;
+
+            /**
+             * Prints formatted message using parameters from
+             * - upper level of recursion (prefixes...)
+             * - this level of recursion (t)
+             * - lower levels of recursion (rest...) - except trailing exception is not included
+             */
+            template <typename... Prefixes> static void print(boost::log::record_ostream& ros,
+                    FormatStringT<Prefixes...> fmt, const Prefixes&... prefixes, const T& t, const Rest&... rest) {
+                FormatHelper<Rest...>::print(ros, prefixes..., t, rest...);
+            }
+        };
+    }
+
+template <typename Arg> struct PrintMe;
+
     /**
      * This class is a template so that we can easily procude two versions of
      * thread-safe (MT) and non-thread-safe
@@ -45,105 +99,101 @@ namespace util::log {
         template<class Logger, typename MARKER>
         friend Logger& _getLogger();
 
-        /** Helper function, is invoked when last arg pass to _log extends std::exception */
-        template<typename ...Args, std::size_t ...Is>
-        void _logExc(severity_level severityLevel, const std::tuple<Args...>& tup, std::index_sequence<Is...>) {
+        /** This version will get used if last arg is an exception */
+        template<typename ...Args>
+        requires _detail::EndsInException<Args...>
+        void _log(severity_level severityLevel,
+                _detail::FormatHelper<Args...>::template FormatStringT<> fmt,
+                const Args&... args) {
             using boost::log::keywords::severity;
 
             if (auto record = this->open_record(severity = severityLevel)) {
                 ros_t ros{record};
-                ((ros << std::get<Is>(tup)),...);
-                _appendException(ros, std::get<sizeof...(Args) - 1>(tup));
+                _detail::FormatHelper<Args...>::template print<>(ros, fmt, args...);
+                _appendException(ros, _detail::FormatHelper<Args...>::getExc(args...));
                 this->push_record(std::move(record));
             }
-        }
-
-        /** This version will get used if last arg is an exception */
-        template<typename ...Args>
-        requires (sizeof...(Args) > 0) && std::is_base_of_v<std::exception,
-                typename std::tuple_element<sizeof...(Args) - 1, std::tuple<Args...>>::type>
-        void _log(severity_level severityLevel, const Args&... args) {
-            _logExc(severityLevel, std::tie(args...),
-                    std::make_index_sequence<sizeof...(Args) - 1>{});
         }
 
         /** This version will get used if last arg is not an exception of if there are no args */
         template<typename ...Args>
-        void _log(severity_level severityLevel, const Args&... args) {
+        void _log(severity_level severityLevel, std::format_string<Args...> fmt, const Args&... args) {
             using boost::log::keywords::severity;
 
             if (auto record = this->open_record(severity = severityLevel)) {
                 ros_t ros{record};
-                (ros << ... << args);
+                std::print(ros.stream(), fmt, args...);
                 this->push_record(std::move(record));
             }
         }
 
-        /* This is another way to determine that last arg passed is an exception - via a recursive template */
-        /*template<typename A0, typename ...Args> void _logOneByOne(ros_t& ros,
-                const A0& a0, const Args&... args) {
-            ros << a0;
-            _logOneByOne(ros, args...);
-        }
-
-        template<typename A0> void _logOneByOne(ros_t& ros, const A0& a0) {
-            ros << a0;
-        }
-
-        template<typename E> requires std::is_base_of_v<std::exception, E>
-        void _logOneByOne(ros_t& ros, const E& e) {
-            _appendException(ros, e);
-        }
-
-        template<typename ...Args> void _log(severity_level severityLevel, const Args&... args) {
+        template<typename ...Args> void _logWithCurrentException(severity_level severityLevel,
+                std::format_string<Args...> fmt, const Args&... args) {
             using boost::log::keywords::severity;
 
             if (auto record = this->open_record(severity = severityLevel)) {
                 ros_t ros{record};
-                _logOneByOne(ros, args...);
-                ros.flush();
-                this->push_record(std::move(record));
-            }
-        }*/
-
-        template<typename ...Args> void _logWithCurrentException(severity_level severityLevel, const Args&... args) {
-            using boost::log::keywords::severity;
-
-            if (auto record = this->open_record(severity = severityLevel)) {
-                ros_t ros{record};
-                (ros << ... << args);
+                std::print(ros.stream(), fmt, args...);
                 _appendCurrentException(ros);
                 ros.flush();
                 this->push_record(std::move(record));
             }
         }
     public:
-        /** If the last argument passed extends std::exception we shall print stack trace all right */
-        template<typename ...Args> void debug(const Args&... args) {
-            _log(DEBUG, args...);
+        template<typename ...Args>
+        requires _detail::EndsInException<Args...>
+        void debug(_detail::FormatHelper<Args...>::template FormatStringT<> fmt, const Args&... args) {
+            _log(DEBUG, fmt, args...);
         }
 
-        /** If the last argument passed extends std::exception we shall print stack trace all right */
-        template<typename ...Args> void info(const Args&... args) {
-            _log(INFO, args...);
+        template<typename ...Args>
+        requires (!_detail::EndsInException<Args...>) // selects wrong template without this
+        void debug(std::format_string<Args...> fmt, const Args&... args) {
+            _log(DEBUG, fmt, args...);
         }
 
-        /** If the last argument passed extends std::exception we shall print stack trace */
-        template<typename ...Args> void warn(const Args&... args) {
-            _log(WARN, args...);
+        template<typename ...Args>
+        requires _detail::EndsInException<Args...>
+        void info(_detail::FormatHelper<Args...>::template FormatStringT<> fmt, const Args&... args) {
+            _log(INFO, fmt, args...);
         }
 
-        /** If the last argument passed extends std::exception we shall print stack trace */
-        template<typename ...Args> void error(const Args&... args) {
-            _log(ERROR, args...);
+        template<typename ...Args>
+        requires (!_detail::EndsInException<Args...>) // selects wrong template without this
+        void info(std::format_string<Args...> fmt, const Args&... args) {
+            _log(INFO, fmt, args...);
         }
 
-        template<typename ...Args> void warnWithCurrentException(const Args&... args) {
-            _logWithCurrentException(WARN, args...);
+        template<typename ...Args>
+        requires _detail::EndsInException<Args...>
+        void warn(_detail::FormatHelper<Args...>::template FormatStringT<> fmt, const Args&... args) {
+            _log(WARN, fmt, args...);
         }
 
-        template<typename ...Args> void errorWithCurrentException(const Args&... args) {
-            _logWithCurrentException(ERROR, args...);
+        template<typename ...Args>
+        requires (!_detail::EndsInException<Args...>) // selects wrong template without this
+        void warn(std::format_string<Args...> fmt, const Args&... args) {
+            _log(WARN, fmt, args...);
+        }
+
+        template<typename ...Args>
+        requires _detail::EndsInException<Args...>
+        void error(_detail::FormatHelper<Args...>::template FormatStringT<> fmt, const Args&... args) {
+            _log(ERROR, fmt, args...);
+        }
+
+        template<typename ...Args>
+        requires (!_detail::EndsInException<Args...>) // selects wrong template without this
+        void error(std::format_string<Args...> fmt, const Args&... args) {
+            _log(ERROR, fmt, args...);
+        }
+
+        template<typename ...Args> void warnWithCurrentException(std::format_string<Args...> fmt, const Args&... args) {
+            _logWithCurrentException(WARN, fmt, args...);
+        }
+
+        template<typename ...Args> void errorWithCurrentException(std::format_string<Args...> fmt, const Args&... args) {
+            _logWithCurrentException(ERROR, fmt, args...);
         }
 
         /* Instances of _Logger can actually be copied but we want all usage to go via getLogger() */
