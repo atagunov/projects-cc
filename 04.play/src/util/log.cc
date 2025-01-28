@@ -63,8 +63,8 @@ namespace {
 
     /**
      * We take 'prev' by value since we assume that moving is cheap and at call site we make sure to std::move
-     * In other methods which just pass through this object to us we take by && (rvalue reference)
-     * to ensure we don't fortet that std::move when invoking them
+     * In other methods which take it by && (rvalue reference) to ensure we don't fortet that std::move when invoking them
+     * Shouldn't make a big difference either way
      */
     stacktrace appendCurrentExceptionTrace(record_ostream& ros, int level, stacktrace prev) {
         auto trace = stacktrace::from_current_exception();
@@ -176,7 +176,7 @@ namespace util::log {
         if (!ePtr) {
             // looks like we have been invoked outside a catch block
             // so we cannot use stack walking to print a stack trace
-            // let us just print exception info on the exception passed in as 'e'
+            // let us just print exception info on thecaused by exception passed in as 'e'
             // possible future enhancement: use boost facilities for capturing exception stack trace in exception
             // rather than boost facilities for waling stack trace of the currently handled exception
             prettyPrint(ros, e);
