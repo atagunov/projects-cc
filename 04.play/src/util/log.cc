@@ -19,6 +19,8 @@ using boost::log::record_ostream;
 
 namespace {
     using boost::stacktrace::stacktrace;
+    using std::views::take_while;
+    using std::ranges::subrange;
 
     /**
      * We may record address of the stackframe above main, in libc here
@@ -34,7 +36,7 @@ namespace {
      * Indeed it is theoretically possible that a static initializer will start another thread before this variable is set in main()
      * In that case we want to make sure that either nullptr or correct frame address is read from this variable
      *
-     * In practice this will be the case on x86 platform but to make this intent very explicit we do an std::atomic read and write
+     * In practice this will be the case on x86-64 platform but to make this intent very explicit we do an std::atomic read and write
      * with relaxed memory ordering
      */
     std::atomic<boost::stacktrace::detail::native_frame_ptr_t> stopTracesHere;
@@ -45,24 +47,18 @@ namespace {
         }
     }
 
-    /**
-     * @return false if we hit stopTracesHere and no further printing necessary; otherwise true to indicate further printing may be necessary
-     */
-    auto appendStackFrames(record_ostream& ros, auto ptr, auto stop, int level) {
-        auto blocker = stopTracesHere.load(std::memory_order_relaxed);
-
-        for (; ptr != stop; ++ptr) {
-            if (ptr->address() == blocker) {
-                return false;
+    void appendStackFrames(record_ostream& ros, auto traceView, int level, int bannerAt) {
+        int counter = 0;
+        for (auto& frame : traceView) {
+            if (counter++ == bannerAt) {
+                appendLevel(ros, level);
+                ros << "--caught here--" << std::endl;
             }
-
             appendLevel(ros, level);
             ros << "at ";
-            ros << *ptr;
+            ros << frame;
             ros << std::endl;
         }
-
-        return true;
     }
 
     /**
@@ -71,36 +67,39 @@ namespace {
      * to ensure we don't fortet that std::move when invoking them
      */
     stacktrace appendCurrentExceptionTrace(record_ostream& ros, int level, stacktrace prev) {
-        //std::cout << "prev=";
-        //std::for_each(begin(prev), end(prev), [](auto frame){std::cout << frame.address() << std::endl;});
-        //std::cout << std::endl << std::endl;
         auto trace = stacktrace::from_current_exception();
-        if (trace) {
-            auto proj = [](boost::stacktrace::frame frame){return frame.address();};
-            auto [r1, r2] = std::ranges::mismatch(rbegin(trace), rend(trace), rbegin(prev), rend(prev),
-                    std::ranges::equal_to{}, proj, proj);
-
-            ros << std::endl;
-            auto midPoint = r1.base();
-            auto fullStop = end(trace);
-
-            // we have printed until the point this stack trace started matching prev stack trace
-            // only if we're on level 1 which is our 1st level - we don't have level 0 - then we shall
-            // print the rest of stack too, but not beyond stopTracesHere
-            // we additionally want to avoid printing "caught-here" line if there are no more stack frames to print
-            // e.g. we're already at the end of the trace or the next frame matches stopTracesHere
-            if (appendStackFrames(ros, begin(trace), midPoint, level) && level == 1 && midPoint != fullStop
-                    && midPoint->address() != stopTracesHere.load(std::memory_order_relaxed)) {
-                appendLevel(ros, level);
-                ros << "--caught here--" << std::endl;
-                appendStackFrames(ros, midPoint, fullStop, level);
-            }
-
-            return std::move(trace);
+        if (!trace) {
+            /* strange we got here but let's use prev stacktrace for diffs; and this disables RVO, sadly */
+            return std::move(prev);
         }
 
-        /* strange we got here but let's use prev stacktrace for diffs; and this disables RVO, sadly */
-        return std::move(prev);
+        // switchover point is where we current exception's trace and prev trace become same
+        // when logging at identation level 1 e.g. top level exception we continue priting stack frames
+        // past switchvoer point but at the point we print an additional "caught at" marker
+        // when logging at identiation levels above 1 we simply stop at switchover point
+        // since that part of the trace has already been printed
+        
+        auto proj = [](boost::stacktrace::frame frame){return frame.address();};
+        auto [r1, r2] = std::ranges::mismatch(rbegin(trace), rend(trace), rbegin(prev), rend(prev),
+                std::ranges::equal_to{}, proj, proj);
+        auto switchoverPoint = r1.base();
+
+        // blocker is the address of stack frame above main, probably inside libc
+        // blocker can also be nullptr if such address has not been set
+        // reading with memory order relaxed just to make sure we get all 64 bits in one go atomically
+        // probably an excessive precaution
+
+        auto blocker = stopTracesHere.load(std::memory_order_relaxed);
+        auto pred = [blocker](auto frame){ return frame.address() != blocker; };
+
+        ros << std::endl;
+        if (level > 1) {
+            appendStackFrames(ros, take_while(subrange(begin(trace), switchoverPoint), pred), level, -1);
+        } else {
+            appendStackFrames(ros, take_while(trace, pred), level, switchoverPoint - begin(trace));
+        }
+
+        return std::move(trace);
     }
 
     void appendUnknownExceptionInfo(record_ostream& ros, int level,
