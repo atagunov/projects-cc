@@ -73,9 +73,16 @@ namespace {
             return std::move(prev);
         }
 
-        // switchover point is where we current exception's trace and prev trace become same
+        // switchover point is where the current exception's trace and prev trace converge
+        // prev trace on level 1 is the stack trace of the code logging the exception
+        // presumingly coming from catch block
+        //
+        // level above 1 is a nested exception and prev trace is the trace of the excption one level up
+        // which has already been printed to ros
+        //
         // when logging at identation level 1 e.g. top level exception we continue priting stack frames
         // past switchvoer point but at the point we print an additional "caught at" marker
+        //
         // when logging at identiation levels above 1 we simply stop at switchover point
         // since that part of the trace has already been printed
         
