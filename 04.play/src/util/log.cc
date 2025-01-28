@@ -64,7 +64,7 @@ namespace {
     /**
      * We take 'prev' by value since we assume that moving is cheap and at call site we make sure to std::move
      * In other methods we take it by && (rvalue reference) before it finally gets passed here
-     * We use && there to ensure we don't fortet writing std::move when invoking those other methods
+     * We use && there to ensure we don't forget writing std::move when invoking those other methods
      * Shouldn't make a big difference either way
      */
     stacktrace appendCurrentExceptionTrace(record_ostream& ros, int level, stacktrace prev) {
