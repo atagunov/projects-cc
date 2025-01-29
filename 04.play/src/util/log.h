@@ -29,8 +29,8 @@ namespace util::log {
 
     std::ostream& operator<<(std::ostream& os, severity_level severity);
 
-    void _appendException(boost::log::record_ostream& ros, const std::exception& e);
-    void _appendCurrentException(boost::log::record_ostream& ros);
+    void _appendException(boost::log::record_ostream&, const std::exception&);
+    void _appendException(boost::log::record_ostream&, std::exception_ptr);
 
     namespace _detail {
         /** Concept checking if the last type in Args... has std::exception as base class */
@@ -158,7 +158,7 @@ namespace util::log {
             if (auto record = this->open_record(severity = severityLevel)) {
                 ros_t ros{record};
                 std::print(ros.stream(), fmt, args...);
-                _appendCurrentException(ros);
+                _appendException(ros, std::current_exception());
                 ros.flush();
                 this->push_record(std::move(record));
             }
@@ -246,9 +246,20 @@ namespace util::log {
     }
 
     /**
-     * If suppressStackTracesAboveHere is true we assume that we have been called from main
-     * and we mark address one level above that so that we don't print the part of the stack
-     * trace that doesn't belong to main anymore and belongs say to libc
+     * main() would call this function with levelsAbove = 1
+     * that will mean that we shall take note of the address 1 level above the caller
+     * and should we see it in a stack trace we shall stop printing the stacktrace
+     * this helps us avoid printing addresses from libc
      */
-    void setupSimpleConsoleLogging(bool suppressStackTracesAboveHere);
+    void suppressTracesAbove(std::size_t levelsAbove = 1);
+
+    /**
+     * Invokes boost::log::add_common_attributes() and adds timestamps and levels
+     */
+    void doCommonLoggingSetup();
+
+    /**
+     * Activate logging to console
+     */
+    void logToConsole();
 }

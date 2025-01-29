@@ -55,10 +55,21 @@ namespace {
                 ros << "--caught here--" << std::endl;
             }
             appendLevel(ros, level);
-            ros << "at ";
+            ros << "@ ";
             ros << frame;
             ros << std::endl;
         }
+    }
+
+    auto truncateTrace(auto&& trace) {
+        // blocker is the address of stack frame above main, probably inside libc
+        // blocker can also be nullptr if such address has not been set
+        // reading with memory order relaxed just to make sure we get all 64 bits in one go atomically
+        // probably an excessive precaution
+
+        auto blocker = stopTracesHere.load(std::memory_order_relaxed);
+        auto pred = [blocker](auto frame){ return frame.address() != blocker; };
+        return take_while(trace, pred);
     }
 
     /**
@@ -92,19 +103,11 @@ namespace {
                 std::ranges::equal_to{}, proj, proj);
         auto switchoverPoint = r1.base();
 
-        // blocker is the address of stack frame above main, probably inside libc
-        // blocker can also be nullptr if such address has not been set
-        // reading with memory order relaxed just to make sure we get all 64 bits in one go atomically
-        // probably an excessive precaution
-
-        auto blocker = stopTracesHere.load(std::memory_order_relaxed);
-        auto pred = [blocker](auto frame){ return frame.address() != blocker; };
-
         ros << std::endl;
         if (level > 1) {
-            appendStackFrames(ros, take_while(subrange(begin(trace), switchoverPoint), pred), level, -1);
+            appendStackFrames(ros, truncateTrace(subrange(begin(trace), switchoverPoint)), level, -1);
         } else {
-            appendStackFrames(ros, take_while(trace, pred), level, switchoverPoint - begin(trace));
+            appendStackFrames(ros, truncateTrace(trace), level, switchoverPoint - begin(trace));
         }
 
         return std::move(trace);
@@ -151,18 +154,32 @@ namespace util::log {
 
 namespace {
     void handleTerminate() {
-        util::log::getLogger<struct util::log::handle_terminate_log>().errorWithCurrentException(
-            "Application being terminated");
+        using boost::log::keywords::severity;
+        using ros_t = boost::log::record_ostream;
+
+        auto& logger = util::log::getLogger<struct util::log::handle_terminate_log>();
+
+        if (auto record = logger.open_record(severity = util::log::ERROR)) {
+            ros_t ros{record};
+            ros << "Application being terminated\n";
+            appendStackFrames(ros, truncateTrace(stacktrace{}), 1, -1);
+
+            auto ePtr = std::current_exception();
+            if (ePtr) {
+                ros << "Current exception";
+                util::log::_appendException(ros, std::current_exception());
+            }
+            logger.push_record(std::move(record));
+        }
         std::abort();
     }
 }
 
 namespace util::log {
-    void _appendCurrentException(record_ostream& ros) {
-        auto ePtr = std::current_exception();
+    void _appendException(record_ostream& ros, std::exception_ptr ePtr) {
         if (ePtr) {
             try {
-                std::rethrow_exception(ePtr);
+                std::rethrow_exception(std::move(ePtr));
             } catch (const std::exception& e) {
                 appendStdExceptionInfo(ros, e, 1, stacktrace{});
             } catch (...) {
@@ -220,20 +237,19 @@ namespace util::log {
     BOOST_LOG_ATTRIBUTE_KEYWORD(severity, "Severity", severity_level)
     BOOST_LOG_ATTRIBUTE_KEYWORD(channel, "Channel", std::string)
 
-    void setupSimpleConsoleLogging(bool suppressStackTracesAboveHere) {
-        if (suppressStackTracesAboveHere) {
-            stacktrace trace{2, 1};
-            if (!trace.empty()) {
-                stopTracesHere.store(trace[0].address(), std::memory_order_relaxed);
-            }
+    void suppressTracesAbove(std::size_t levelsAbove) {
+        stacktrace trace{levelsAbove + 1, 1};
+        if (!trace.empty()) {
+            stopTracesHere.store(trace[0].address(), std::memory_order_relaxed);
         }
+    }
 
+    void doCommonLoggingSetup() {
         using boost::shared_ptr;
         using boost::log::core;
+
         namespace dans = boost::log::aux::default_attribute_names;
-        namespace kwds = boost::log::keywords;
         namespace attrs = boost::log::attributes;
-        namespace exprs = boost::log::expressions;
 
         boost::log::add_common_attributes();
 
@@ -246,6 +262,16 @@ namespace util::log {
             dans::thread_id(),
             attrs::current_thread_id());
 
+        std::set_terminate(handleTerminate);
+    }
+
+    void logToConsole() {
+        using boost::log::core;
+        namespace dans = boost::log::aux::default_attribute_names;
+        namespace kwds = boost::log::keywords;
+        namespace attrs = boost::log::attributes;
+        namespace exprs = boost::log::expressions;
+
         // not successful in outputting severity via text-based format so going for functional style
         boost::log::add_console_log(std::clog, kwds::format = (
             exprs::stream
@@ -255,7 +281,5 @@ namespace util::log {
                 << " [" << channel << "] "
                 << exprs::smessage
         ));
-
-        std::set_terminate(handleTerminate);
     }
 }

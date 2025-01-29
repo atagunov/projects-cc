@@ -64,7 +64,9 @@ void sub_routine() {
 }
 
 int main() {
-    util::log::setupSimpleConsoleLogging(true);
+    util::log::suppressTracesAbove();
+    util::log::doCommonLoggingSetup();
+    util::log::logToConsole();
 
     auto& logger = getLogger<struct main>();
     logger.info("Starting; here's an int/float/long to check formatting: {}/{}/{}", 18, 1.0f, 1000l);
