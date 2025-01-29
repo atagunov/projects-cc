@@ -167,7 +167,7 @@ namespace {
             auto ePtr = std::current_exception();
             if (ePtr) {
                 ros << "Current exception";
-                util::log::_appendException(ros, std::current_exception());
+                util::log::_appendException(ros, std::move(ePtr));
             }
             logger.push_record(std::move(record));
         }
