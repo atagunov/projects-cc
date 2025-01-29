@@ -244,7 +244,7 @@ namespace util::log {
         }
     }
 
-    void doCommonLoggingSetup() {
+    void commonLoggingSetup() {
         using boost::shared_ptr;
         using boost::log::core;
 

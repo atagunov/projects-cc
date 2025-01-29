@@ -256,7 +256,7 @@ namespace util::log {
     /**
      * Invokes boost::log::add_common_attributes() and adds timestamps and levels
      */
-    void doCommonLoggingSetup();
+    void commonLoggingSetup();
 
     /**
      * Activate logging to console

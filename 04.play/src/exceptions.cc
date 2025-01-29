@@ -65,7 +65,7 @@ void sub_routine() {
 
 int main() {
     util::log::suppressTracesAbove();
-    util::log::doCommonLoggingSetup();
+    util::log::commonLoggingSetup();
     util::log::logToConsole();
 
     auto& logger = getLogger<struct main>();
