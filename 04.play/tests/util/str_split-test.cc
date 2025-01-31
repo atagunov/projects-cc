@@ -12,6 +12,7 @@ std::string runTest(const util::str_split::StrSplitView<std::string_view> view, 
     std::ostringstream s;
 
     if (!std::ranges::equal(view, expected)) {
+        s << "Actual: ";
         std::ranges::copy(view, std::ostream_iterator<std::string_view>(s, ", "));
     }
 
