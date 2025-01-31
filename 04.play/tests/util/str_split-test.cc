@@ -8,7 +8,7 @@
 using namespace std::string_view_literals;
 
 template<typename EXPECTED>
-std::string runTest(const util::str_split::StrSplitView<std::string_view> view, EXPECTED expected) {
+std::string runTest(const util::str_split::StrSplitView<std::string_view> view, EXPECTED&& expected) {
     std::ostringstream s;
 
     if (!std::ranges::equal(view, expected)) {
