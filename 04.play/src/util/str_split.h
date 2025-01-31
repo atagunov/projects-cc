@@ -151,7 +151,7 @@ namespace util::str_split {
     StrSplitView(View&& view) -> StrSplitView<std::ranges::views::all_t<View>>;
 
     /*
-     * We could define range close object too, but for now it will suffice to have the view class
-     * Besides it seems custom view objects cannot chained via | operator with view adapters from standard library anyway
+     * We could define a range closure object too, but for now it will suffice to have the view class
+     * Besides it seems custom view objects cannot be chained via | operator with view adapters from standard library anyway
      */
 }
