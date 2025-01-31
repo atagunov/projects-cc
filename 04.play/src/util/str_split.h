@@ -23,25 +23,34 @@
 
 #include <iterator>
 #include <ranges>
+#include <string_view>
 
 namespace util::str_split {
     /** We're defining StrSplitView after this class */
     template<std::forward_iterator BaseIter>
     requires std::is_same_v<std::iter_value_t<BaseIter>, char>
-    class StrSplitIterator: public std::iterator<std::forward_iterator_tag, std::pair<BaseIter, BaseIter>> {
+    class StrSplitIterator {
+    public:
+        using value_type = std::string_view;
+        using difference_type = ptrdiff_t; // forward_iterator concept requries this even though we don't compute diffs
+        using iterator_category = std::forward_iterator_tag;
+    private:
         BaseIter _start;
-        const BaseIter _underlyingStop;
+        BaseIter _underlyingStop;
         BaseIter _next;
         BaseIter _stop;
     public:
+
+        StrSplitIterator() {}
+        StrSplitIterator(const StrSplitIterator&) = default;
+        StrSplitIterator& operator=(const StrSplitIterator&) = default;
+
         StrSplitIterator(BaseIter start, BaseIter stop): _start(start), _underlyingStop(stop), _next(start), _stop(start) {
             /* this iterator is actually safe to ++ even when it's done, it just does nothing then */
             ++*this;
         }
 
-        StrSplitIterator(const StrSplitIterator&) = default;
-
-        bool operator==(const StrSplitIterator& other) {
+        bool operator==(const StrSplitIterator& other) const {
             return _start == other._start && _stop == other._stop;
         }
 
@@ -51,21 +60,22 @@ namespace util::str_split {
          *
          * Question: do we need this? We can perfectly happily use same class set to end of sequence as end iterator
          */
-        bool operator==(std::default_sentinel_t&) {
+        bool operator==(std::default_sentinel_t&) const {
             return _start == _underlyingStop;
         }
 
-        std::pair<BaseIter, BaseIter> operator*() {
+        std::string_view operator*() const {
             // this check is in-sync with operator==(std::default_sentinel_t&)
             if (_start == _underlyingStop) {
                 throw std::out_of_range("Iterator past the end");
             }
-            return std::pair(_start, _stop);
+            return std::string_view(_start, _stop);
         }
 
         StrSplitIterator& operator++() {
             _start = _next;
             if (_next == _underlyingStop) {
+                _stop = _underlyingStop; // so that we compare as equal to end iterator
                 return *this;
             }
 
@@ -103,7 +113,16 @@ namespace util::str_split {
                 }
             }
         }
+
+        StrSplitIterator operator++(int) {
+            StrSplitIterator copy = *this;
+            ++*this;
+            return copy;
+        }
     };
+
+    /* let's make sure std::ranges algorithms will be happy to accept this */
+    static_assert(std::forward_iterator<StrSplitIterator<char*>>);
 
     template <std::ranges::view View>
     requires std::ranges::input_range<View>
@@ -113,14 +132,17 @@ namespace util::str_split {
     public:
         StrSplitView(View v): _subview(std::move(v)) {};
         auto begin() const {
-            return StrSplitIterator(begin(_subview), end(_subview)); 
+            return StrSplitIterator(_subview.begin(), _subview.end()); 
         }
         auto end() const {
             /* hmm could return std::default_sentinel here */
-            auto stop = end(_subview);
+            auto stop = _subview.end();
             return StrSplitIterator(stop, stop);
         }
     };
+
+    static_assert(std::ranges::view<StrSplitView<std::string_view>>);
+    static_assert(std::ranges::input_range<StrSplitView<std::string_view>>);
 
     /* Deduction guide to allow us to use owned_view */
     template <std::ranges::view View>
