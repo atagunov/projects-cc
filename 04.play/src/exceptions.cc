@@ -80,7 +80,7 @@ int main() {
         logger.errorWithCurrentException("Something went wrong again doing f1()");
     }*/
 
-    throw some::TestException("from-main");
+     throw some::TestException("from-main");
 
     logger.info("Exiting");
     return 0;

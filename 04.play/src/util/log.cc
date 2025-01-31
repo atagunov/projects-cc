@@ -265,21 +265,39 @@ namespace util::log {
         std::set_terminate(handleTerminate);
     }
 
-    void logToConsole() {
-        using boost::log::core;
-        namespace dans = boost::log::aux::default_attribute_names;
-        namespace kwds = boost::log::keywords;
-        namespace attrs = boost::log::attributes;
-        namespace exprs = boost::log::expressions;
 
-        // not successful in outputting severity via text-based format so going for functional style
-        boost::log::add_console_log(std::clog, kwds::format = (
-            exprs::stream
+    using boost::log::sinks::synchronous_sink;
+    using boost::log::sinks::text_ostream_backend;
+
+    namespace dans = boost::log::aux::default_attribute_names;
+    namespace kwds = boost::log::keywords;
+    namespace attrs = boost::log::attributes;
+    namespace exprs = boost::log::expressions;
+
+    void setStandardLogFormat(boost::shared_ptr<synchronous_sink<text_ostream_backend>> ptr) {
+        ptr -> set_formatter(exprs::stream
                 << exprs::format_date_time(timestamp, "%Y-%m-%d %H:%M:%S.%f")
                 << " #" << std::setw(5) << std::left
                 << severity << std::setw(0)
                 << " [" << channel << "] "
-                << exprs::smessage
-        ));
+                << exprs::smessage);
+    }
+
+    void logToConsole() {
+        using boost::log::core;
+
+        // we used to do boost::log::add_console_log(std::clog, kwds::format = (
+        //     exprs::stream << .. << exprs::smessage ));
+        // but the code has been changed to factor out setStandardLogFormat into its own method
+
+        auto pCout = boost::shared_ptr<std::ostream>(&std::clog, boost::null_deleter{});
+
+        auto backend = boost::make_shared<text_ostream_backend>();
+        backend -> add_stream(pCout);
+
+        auto sink = boost::make_shared<synchronous_sink<text_ostream_backend>>(backend);
+        setStandardLogFormat(sink);
+
+        core::get() -> add_sink(sink);
     }
 }

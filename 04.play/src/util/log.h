@@ -4,6 +4,7 @@
 #include <print>
 
 #include <boost/log/attributes.hpp>
+#include <boost/log/sinks.hpp>
 #include <boost/log/sources/severity_channel_logger.hpp>
 #include <boost/log/sources/record_ostream.hpp>
 #include <boost/log/keywords/channel.hpp>
@@ -262,4 +263,7 @@ namespace util::log {
      * Activate logging to console
      */
     void logToConsole();
+
+    void setStandardLogFormat(boost::shared_ptr<boost::log::sinks::synchronous_sink<
+            boost::log::sinks::text_ostream_backend>>);
 }
