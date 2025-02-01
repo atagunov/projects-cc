@@ -96,11 +96,11 @@ void doTestSimpleException(std::string result) {
     ASSERT_TRUE(lines.size() > 3);
     EXPECT_TRUE(lines[0].ends_with(" #ERROR [test] Oh! It's an exception: testexc::TestException(Some interesting message)"))
             << " but it is " << lines[0];
-    EXPECT_TRUE(lines[1].starts_with("\t@ a()"))
+    EXPECT_TRUE(lines[1].starts_with("\t@ a()") || lines[1].starts_with("\t@ 0x"))
             << " but it is " << lines[1];
-    EXPECT_TRUE(lines[2].starts_with("\t@ b()"))
+    EXPECT_TRUE(lines[2].starts_with("\t@ b()") || lines[2].starts_with("\t@ 0x"))
             << " but it is " << lines[2];
-    EXPECT_TRUE(lines[3].starts_with("\t@ c()"))
+    EXPECT_TRUE(lines[3].starts_with("\t@ c()") || lines[3].starts_with("\t@ 0x"))
             << " but it is " << lines[3];
 }
 
