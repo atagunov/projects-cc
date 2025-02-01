@@ -4,6 +4,7 @@
 #include <future>
 
 #include <util/log.h>
+#include <boost/config.hpp>
 
 using std::string;
 using std::logic_error;
@@ -25,14 +26,17 @@ namespace some {
 }
 
 namespace {
+    BOOST_NOINLINE
     void f5() {
         throw some::TestException("test");
     }
 
+    BOOST_NOINLINE
     void f4() {
         f5();
     }
 
+    BOOST_NOINLINE
     void f3() {
         try {
             f4();
@@ -41,10 +45,12 @@ namespace {
         }
     }
 
+    BOOST_NOINLINE
     void f2() {
         f3();
     }
 
+    BOOST_NOINLINE
     void f1() {
         f2();
     }
