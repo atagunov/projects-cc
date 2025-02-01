@@ -52,7 +52,7 @@ namespace {
         for (auto& frame : traceView) {
             if (counter++ == bannerAt) {
                 appendLevel(ros, level);
-                ros << "--caught here--" << std::endl;
+                ros << "--stacktrace-converges-with-this-thread--" << std::endl;
             }
             appendLevel(ros, level);
             ros << "@ ";

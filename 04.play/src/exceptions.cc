@@ -1,6 +1,7 @@
 #include <iostream>
 #include <exception>
 #include <chrono>
+#include <future>
 
 #include <util/log.h>
 
@@ -63,6 +64,15 @@ void sub_routine() {
     }
 }
 
+void dealWithExcOnThatThread(std::exception_ptr ptr) {
+    try {
+        std::rethrow_exception(ptr);
+    } catch (...) {
+        auto& logger = getLogger<struct main>();
+        logger.errorWithCurrentException("Now caught exception from a diff thread");
+    }
+}
+
 int main() {
     util::log::suppressTracesAbove();
     util::log::commonLoggingSetup();
@@ -80,7 +90,29 @@ int main() {
         logger.errorWithCurrentException("Something went wrong again doing f1()");
     }*/
 
-     throw some::TestException("from-main");
+    auto future = std::async(std::launch::async, f1);
+    try {
+        future.get();
+    } catch (...) {
+        logger.errorWithCurrentException("exception from future");
+    }
+
+    auto future2 = std::async(std::launch::async, f1);
+    std::optional<std::exception_ptr> exc;
+    try {
+        future2.get();
+    } catch (...) {
+        logger.info("wrapping exception...");
+        exc = std::current_exception();
+    }
+
+    if (exc.has_value() && exc.value()) {
+        std::async(std::launch::async, dealWithExcOnThatThread, exc.value()).get();
+    } else {
+        logger.error("No exception to pay with");
+    }
+
+    throw some::TestException("from-main");
 
     logger.info("Exiting");
     return 0;

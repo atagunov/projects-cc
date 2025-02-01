@@ -26,10 +26,10 @@
 #include <string_view>
 
 namespace util::str_split {
-    /** We're defining StrSplitView after this class */
+    /** We're defining LinesSplitView after this class */
     template<std::forward_iterator BaseIter>
     requires std::is_same_v<std::iter_value_t<BaseIter>, char>
-    class StrSplitIterator {
+    class LinesSplitIterator {
     public:
         using value_type = std::string_view;
         using difference_type = ptrdiff_t; // forward_iterator concept requries this even though we don't compute diffs
@@ -41,16 +41,16 @@ namespace util::str_split {
         BaseIter _stop;
     public:
 
-        StrSplitIterator() {}
-        StrSplitIterator(const StrSplitIterator&) = default;
-        StrSplitIterator& operator=(const StrSplitIterator&) = default;
+        LinesSplitIterator() {}
+        LinesSplitIterator(const LinesSplitIterator&) = default;
+        LinesSplitIterator& operator=(const LinesSplitIterator&) = default;
 
-        StrSplitIterator(BaseIter start, BaseIter stop): _start(start), _underlyingStop(stop), _next(start), _stop(start) {
+        LinesSplitIterator(BaseIter start, BaseIter stop): _start(start), _underlyingStop(stop), _next(start), _stop(start) {
             /* this iterator is actually safe to ++ even when it's done, it just does nothing then */
             ++*this;
         }
 
-        bool operator==(const StrSplitIterator& other) const {
+        bool operator==(const LinesSplitIterator& other) const {
             return _start == other._start && _stop == other._stop;
         }
 
@@ -72,7 +72,7 @@ namespace util::str_split {
             return std::string_view(_start, _stop);
         }
 
-        StrSplitIterator& operator++() {
+        LinesSplitIterator& operator++() {
             _start = _next;
             if (_next == _underlyingStop) {
                 _stop = _underlyingStop; // so that we compare as equal to end iterator
@@ -114,41 +114,41 @@ namespace util::str_split {
             }
         }
 
-        StrSplitIterator operator++(int) {
-            StrSplitIterator copy = *this;
+        LinesSplitIterator operator++(int) {
+            LinesSplitIterator copy = *this;
             ++*this;
             return copy;
         }
     };
 
     /* let's make sure std::ranges algorithms will be happy to accept this */
-    static_assert(std::forward_iterator<StrSplitIterator<char*>>);
+    static_assert(std::forward_iterator<LinesSplitIterator<char*>>);
 
     template <std::ranges::view View>
     requires std::ranges::input_range<View>
             && std::is_same_v<std::ranges::range_value_t<View>, char>
-    class StrSplitView: public std::ranges::view_interface<StrSplitView<View>> {
+    class LinesSplitView: public std::ranges::view_interface<LinesSplitView<View>> {
         View _subview;
     public:
-        StrSplitView(View v): _subview(std::move(v)) {};
+        LinesSplitView(View v): _subview(std::move(v)) {};
         auto begin() const {
-            return StrSplitIterator(_subview.begin(), _subview.end()); 
+            return LinesSplitIterator(_subview.begin(), _subview.end()); 
         }
         auto end() const {
             /* hmm could return std::default_sentinel here */
             auto stop = _subview.end();
-            return StrSplitIterator(stop, stop);
+            return LinesSplitIterator(stop, stop);
         }
     };
 
-    static_assert(std::ranges::view<StrSplitView<std::string_view>>);
-    static_assert(std::ranges::input_range<StrSplitView<std::string_view>>);
+    static_assert(std::ranges::view<LinesSplitView<std::string_view>>);
+    static_assert(std::ranges::input_range<LinesSplitView<std::string_view>>);
 
     /* Deduction guide to allow us to use owned_view */
     template <std::ranges::view View>
     requires std::ranges::input_range<View>
             && std::is_same_v<std::ranges::range_value_t<View>, char>
-    StrSplitView(View&& view) -> StrSplitView<std::ranges::views::all_t<View>>;
+    LinesSplitView(View&& view) -> LinesSplitView<std::ranges::views::all_t<View>>;
 
     /*
      * We could define a range closure object too, but for now it will suffice to have the view class
