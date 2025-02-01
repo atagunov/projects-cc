@@ -7,6 +7,7 @@
 #include <exception>
 
 #include <boost/log/sinks.hpp>
+#include <boost/config.hpp>
 
 namespace sinks=boost::log::sinks;
 namespace logging=boost::log;
@@ -73,14 +74,17 @@ namespace testexc {
     };
 }
 
+BOOST_NOINLINE
 void a() {
     throw testexc::TestException("Some interesting message");
 }
 
+BOOST_NOINLINE
 void b() {
     a();
 }
 
+BOOST_NOINLINE
 void c() {
     b();
 }
