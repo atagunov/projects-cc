@@ -9,11 +9,15 @@
 #include <util/memory_counter.h>
 #include <boost/config.hpp>
 
+using util::str_split::LinesSplitView;
 using namespace std::string_literals;
 using namespace std::string_view_literals;
 
-template<typename EXPECTED>
-std::string runTest(const util::str_split::LinesSplitView<std::string_view> view, EXPECTED&& expected) {
+//  earlier version: template<typename EXPECTED> ... runTest(..., EXPECTED&& expected)
+//  runTest(..., std::array<std::string_view, 2>{"abc", "cde"})
+
+std::string runTest(const LinesSplitView<std::string_view> view,
+        std::initializer_list<std::string_view> expected) {
     std::ostringstream s;
 
     if (!std::ranges::equal(view, expected)) {
@@ -24,28 +28,29 @@ std::string runTest(const util::str_split::LinesSplitView<std::string_view> view
     return (std::move(s)).str();
 }
 
-TEST(str_split, test) {
-    /* string_view here is a temporary, we copy it to a member variable; string data remains in immutable section of the binary so ok */
-    util::str_split::LinesSplitView view("abc\ncde"sv);
-    /* one way to create expected view is to use a separate array lvalue, then we can construct a span */
+TEST(str_split, mainTest) {
+    LinesSplitView view("abc\ncde"sv);
     std::string_view expectedA[] = {"abc", "cde"};
     EXPECT_TRUE(std::ranges::equal(view, std::span(expectedA)));
 
-    /* the other way is to use an std::array rvalue */
-    EXPECT_EQ(runTest("abc\ncde\n"sv, std::array<std::string_view, 2>{"abc", "cde"}), "");
-
-    EXPECT_EQ(runTest("abc\r\ncde"sv, std::array<std::string_view, 2>{"abc", "cde"}), "");
-    EXPECT_EQ(runTest("abc\r\ncde\r\n"sv, std::array<std::string_view, 2>{"abc", "cde"}), "");
-    EXPECT_EQ(runTest("abc\r\ncde\r"sv, std::array<std::string_view, 2>{"abc", "cde"}), "");
-    EXPECT_EQ(runTest("abc\rcde\r"sv, std::array<std::string_view, 1>{"abc\rcde"}), "");
-    EXPECT_EQ(runTest("abc\ncde\r\n\n"sv, std::array<std::string_view, 3>{"abc", "cde", ""}), "");
-    EXPECT_EQ(runTest("\r\r\n"sv, std::array<std::string_view, 1>{"\r"}), "");
-    EXPECT_EQ(runTest("abc\n\r\n\ncde\r\r\n"sv, std::array<std::string_view, 4>{"abc", "", "", "cde\r"}), "");
+    EXPECT_EQ(runTest("abc\ncde\n"sv, {"abc", "cde"}), "");
+    EXPECT_EQ(runTest("abc\r\ncde"sv,{"abc", "cde"}), "");
+    EXPECT_EQ(runTest("abc\r\ncde\r\n"sv, {"abc", "cde"}), "");
+    EXPECT_EQ(runTest("abc\r\ncde\r"sv, {"abc", "cde"}), "");
+    EXPECT_EQ(runTest("abc\rcde\r"sv, {"abc\rcde"}), "");
+    EXPECT_EQ(runTest("abc\ncde\r\n\n"sv, {"abc", "cde", ""}), "");
+    EXPECT_EQ(runTest("\r\r\n"sv, {"\r"}), "");
+    EXPECT_EQ(runTest("abc\n\r\n\ncde\r\r\n"sv, {"abc", "", "", "cde\r"}), "");
 }
 
-TEST(str_split, heresHowWeHandleStdString) {
+static constinit LinesSplitView staticView1("abc\ncde"sv);
+TEST(str_split, constExprTest) {
+    EXPECT_TRUE(std::ranges::equal(staticView1, std::array<std::string_view, 2>{"abc", "cde"}));
+}
+
+TEST(str_split, view) {
     std::string s{"a\nquite long really\nc"}; // std::string as an lvalue in case EXPECT_EQ not a single expression
-    EXPECT_EQ(runTest(std::string_view{s}, std::array<std::string_view, 3>{"a", "quite long really", "c"}), "");
+    EXPECT_EQ(runTest(std::string_view{s}, {"a", "quite long really", "c"}), "");
 }
 
 TEST(str_split, sentinelWorks) {
@@ -70,7 +75,7 @@ public:
 TEST(str_split, canUseOwningView) {
     util::memory_counter::MemoryCounts counts;
     {
-        util::str_split::LinesSplitView view{TracedString{"abcdefghijklmopqrt\n14", counts}};
+        LinesSplitView view{TracedString{"abcdefghijklmopqrt\n14", counts}};
         EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 0})) << " but it was " << counts;
     }
     EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 1})) << " but it was " << counts;
@@ -79,7 +84,7 @@ TEST(str_split, canUseOwningView) {
 TEST(str_split, canUseOwningViewExplicitly) {
     util::memory_counter::MemoryCounts counts;
     {
-        util::str_split::LinesSplitView view{std::ranges::owning_view{TracedString{"abcdefghijklmopqrt\n14", counts}}};
+        LinesSplitView view{std::ranges::owning_view{TracedString{"abcdefghijklmopqrt\n14", counts}}};
         EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 0})) << " but it was " << counts;
     }
     EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 1})) << " but it was " << counts;
@@ -91,7 +96,7 @@ TEST(str_split, canUseRefView) {
         /* std::string functions as a range not view */
         auto range = TracedString{"abcdefghijklmopqrt\n14", counts};
         /* this still works because std::ranges::views::all_t conversion is happening constructing RefView temporary */
-        util::str_split::LinesSplitView view{range};
+        LinesSplitView view{range};
         EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 0})) << " but it was " << counts;
     }
     EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 1})) << " but it was " << counts;
@@ -111,7 +116,7 @@ static_assert(std::ranges::view<TracedStringView>);
 TEST(str_split, acceptsViewRValue) {
     util::memory_counter::MemoryCounts counts;
     {
-        util::str_split::LinesSplitView view{TracedStringView{"abcdefghijklmopqrt\n14", counts}};
+        LinesSplitView view{TracedStringView{"abcdefghijklmopqrt\n14", counts}};
         EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 0})) << " but it was " << counts;
     }
     EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 1})) << " but it was " << counts;
@@ -121,7 +126,7 @@ TEST(str_split, acceptsViewLValue) {
     util::memory_counter::MemoryCounts counts;
     TracedStringView underlyingView{"abcdefghijklmopqrt\n14", counts};
     {
-        util::str_split::LinesSplitView view{underlyingView};
+        LinesSplitView view{underlyingView};
         EXPECT_TRUE(counts.check({.constructed = 1, .copied = 1, .freed = 0})) << " but it was " << counts;
     }
     EXPECT_TRUE(counts.check({.constructed = 1, .copied = 1, .freed = 1})) << " but it was " << counts;
@@ -131,7 +136,7 @@ TEST(str_split, acceptsViewLValueViaStdMove) {
     util::memory_counter::MemoryCounts counts;
     TracedStringView underlyingView{"abcdefghijklmopqrt\n14", counts};
     {
-        util::str_split::LinesSplitView<TracedStringView> view{std::move(underlyingView)};
+        LinesSplitView<TracedStringView> view{std::move(underlyingView)};
         EXPECT_TRUE(counts.extendedCheck({.constructed = 1, .copied = 0, .freed = 0, .moved = 2})) << " but it was " << counts;
     }
     EXPECT_TRUE(counts.extendedCheck({.constructed = 1, .copied = 0, .freed = 1, .moved = 2})) << " but it was " << counts;

@@ -152,11 +152,11 @@ namespace util::str_split {
          *
          * Taking by value enables passing lvalue view here if so desired
          */
-        LinesSplitView(View v): _subview(std::move(v)) {};
-        auto begin() const {
+        constexpr LinesSplitView(View v): _subview(std::move(v)) {};
+        constexpr auto begin() const {
             return LinesSplitIterator(_subview.begin(), _subview.end()); 
         }
-        auto end() const {
+        constexpr auto end() const {
             /* hmm could return std::default_sentinel here */
             auto stop = _subview.end();
             return LinesSplitIterator(stop, stop);
