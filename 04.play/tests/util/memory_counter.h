@@ -103,10 +103,10 @@ namespace util::memory_counter {
             }
         }
         MemoryCounter& operator=(const MemoryCounter& other) {
-            _counts = other._counts;
             if (_haveData) {
                 _counts->freed++;
             }
+            _counts = other._counts;
             _haveData = other._haveData;
             if (_haveData) {
                 _counts->copied++;
@@ -114,10 +114,10 @@ namespace util::memory_counter {
             return *this;
         }
         MemoryCounter& operator=(MemoryCounter&& other) {
-            _counts = other._counts;
             if (_haveData) {
                 _counts->freed++;
             }
+            _counts = other._counts;
             _haveData = other._haveData;
             if (_haveData) {
                 _counts->moved++;
