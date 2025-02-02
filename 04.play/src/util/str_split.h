@@ -27,25 +27,26 @@
 
 namespace util::str_split {
     /** We're defining LinesSplitView after this class */
-    template<std::forward_iterator BaseIter>
-    requires std::is_same_v<std::iter_value_t<BaseIter>, char>
+    template<std::forward_iterator BeginIter, typename EndIter>
+    requires std::is_same_v<std::iter_value_t<BeginIter>, char>
+            && std::sentinel_for<EndIter, BeginIter>
     class LinesSplitIterator {
     public:
         using value_type = std::string_view;
-        using difference_type = ptrdiff_t; // forward_iterator concept requries this even though we don't compute diffs
+        using difference_type = ptrdiff_t;
         using iterator_category = std::forward_iterator_tag;
     private:
-        BaseIter _start;
-        BaseIter _underlyingStop;
-        BaseIter _next;
-        BaseIter _stop;
+        BeginIter _start;
+        EndIter _underlyingStop;
+        BeginIter _next;
+        BeginIter _stop;
     public:
 
         LinesSplitIterator() {}
         LinesSplitIterator(const LinesSplitIterator&) = default;
         LinesSplitIterator& operator=(const LinesSplitIterator&) = default;
 
-        LinesSplitIterator(BaseIter start, BaseIter stop): _start(start), _underlyingStop(stop), _next(start), _stop(start) {
+        LinesSplitIterator(BeginIter start, EndIter stop): _start(start), _underlyingStop(stop), _next(start), _stop(start) {
             /* this iterator is actually safe to ++ even when it's done, it just does nothing then */
             ++*this;
         }
@@ -59,8 +60,10 @@ namespace util::str_split {
          * We could alternatively check _start == _next
          *
          * Question: do we need this? We can perfectly happily use same class set to end of sequence as end iterator
+         *
+         * Note: C++20 allows us to omit defining this operator in reverse direction, this operator alone is sufficient
          */
-        bool operator==(std::default_sentinel_t&) const {
+        bool operator==(const std::default_sentinel_t&) const {
             return _start == _underlyingStop;
         }
 
@@ -122,7 +125,11 @@ namespace util::str_split {
     };
 
     /* let's make sure std::ranges algorithms will be happy to accept this */
-    static_assert(std::forward_iterator<LinesSplitIterator<char*>>);
+    static_assert(std::forward_iterator<LinesSplitIterator<char*, char*>>);
+
+    /* since it appears preferable to compile with -Wctad-maybe-unsupported let's provide a deduction guide */
+    template <typename A, typename B>
+    LinesSplitIterator(A, B) -> LinesSplitIterator<A, B>;
 
     template <std::ranges::view View>
     requires std::ranges::input_range<View>
@@ -130,6 +137,21 @@ namespace util::str_split {
     class LinesSplitView: public std::ranges::view_interface<LinesSplitView<View>> {
         View _subview;
     public:
+        /**
+         * Been a big debate: View&& or View
+         *
+         * View classes from standard library typically take View
+         * apparenlty because views are generally cheap to copy
+         * and probably also because the compilers are so good at eliding copies
+         * of prvalues these days
+         *
+         * owning_view is kind of an exception, but a prvalue + compiler optimizations
+         * solve the issue - it still doesn't get copied - most of the time likely
+         *
+         * It'd probably take an explicit instantiation of an owning_view as an lvalue to force a copy
+         *
+         * Taking by value enables passing lvalue view here if so desired
+         */
         LinesSplitView(View v): _subview(std::move(v)) {};
         auto begin() const {
             return LinesSplitIterator(_subview.begin(), _subview.end()); 
@@ -145,10 +167,8 @@ namespace util::str_split {
     static_assert(std::ranges::input_range<LinesSplitView<std::string_view>>);
 
     /* Deduction guide to allow us to use owned_view */
-    template <std::ranges::view View>
-    requires std::ranges::input_range<View>
-            && std::is_same_v<std::ranges::range_value_t<View>, char>
-    LinesSplitView(View&& view) -> LinesSplitView<std::ranges::views::all_t<View>>;
+    template <typename V>
+    LinesSplitView(V&&) -> LinesSplitView<std::ranges::views::all_t<V>>;
 
     /*
      * We could define a range closure object too, but for now it will suffice to have the view class

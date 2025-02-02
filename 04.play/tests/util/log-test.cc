@@ -42,7 +42,7 @@ struct test{};
 
 using namespace std::string_view_literals;
 
-auto splitToVec(std::string& str) {
+auto splitToVec(const std::string& str) {
     return std::ranges::to<std::vector>(util::str_split::LinesSplitView{
             std::string_view{str}});
 }
