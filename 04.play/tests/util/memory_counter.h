@@ -6,15 +6,19 @@
     The idea is to make sure util::str_split::LinesSplitView correctly creates an owning view when needed
 
     To that end we extend std::string with memory counts which tell us now many times our
-    string has been constructed, moved and released.
+    string has been constructed, moved and freed.
 
-    "released" here means that data has been overwritten or destructor has been called
+    The class imitates a container.
+    Initially it considers itself to have data ('_haveData' set to true)
+    Simultaneously 'created' is set to 1.
 
-    If we were dealing with strings of sufficient length then constructed + copied would be the number of dynamic allocations
-    and released - moved would be the number of dynamic memory deallocations
+    Then on each copy we increase 'copied'
+    On each destructor invocation we increase 'released'
+    During a copy if we had '_haveData' set to true we also increase 'freed' as container would release memory
 
-    We collect this stats by inheriting both std::string and tests::util util::memory_counter::MemoryCounter
-    It is then sufficient for our class to have default copy and move constructors and assignment operators
+    On each move we increase 'moved' and also flip '_haveData' on that instance to false
+    Further any attemp to copy or move from that instance do not increase any numbers, it beahves as an empty container
+    Destructor does not increase 'freed' either
 */
 
 namespace util::memory_counter {
