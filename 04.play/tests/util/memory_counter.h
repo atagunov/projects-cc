@@ -8,7 +8,7 @@
     To that end we extend std::string with memory counts which tell us now many times our
     string has been constructed, moved and freed.
 
-    The class imitates a container.
+    The class imitates a container like std::string or vector
     Initially it considers itself to have data ('_haveData' set to true)
     Simultaneously 'created' is increased by 1, generally it should have been at zero so result should be 1
 
@@ -17,7 +17,7 @@
     During a copy if we had '_haveData' set to true we also increase 'freed' as container would release old memory at this point
 
     On each move we increase 'moved' and also flip '_haveData' on that instance we're imitating a move from to false
-    Further any attemp to copy or move from that instance do not increase any numbers, it beahves as an empty container
+    Further any attemp to copy or move from that instance do not increase any numbers, it behaves as an empty container
     Destructor does not increase 'freed' either
 */
 
