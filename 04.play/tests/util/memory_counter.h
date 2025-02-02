@@ -78,10 +78,11 @@ namespace util::memory_counter {
      * This allows us to count how many of each operation actually happened
      * All those instances within same test share a pointer to the same instance of MemoryCounts
      *
-     * We use a pointer as it doesn't preclude default constructors and operator='s from being generated
-     * on the container we embed this class into
+     * We use a pointer as it is easy to copy it between instances
+     * Generally we shouldn't have needed to copy it around given the way currently existing unit tests are written
      *
-     * Otherwise it could have been a reference
+     * However to make the code more general the possibility of using multiple instances of MemoryCounts in the same
+     * unit tests is supported
      */
     class MemoryCounter {
         MemoryCounts* _counts;
