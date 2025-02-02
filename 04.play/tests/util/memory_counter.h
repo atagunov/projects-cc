@@ -68,8 +68,8 @@ namespace util::memory_counter {
 
     /**
      * We embed an instance of this class into our containers
-     * We then use default copy/move constructors and assignment on those containers
-     * These default cont constructors and assignment operators then invoke methods in this class as needed
+     * We then specify those containers to have  = default copy/move constructors and assignment operators
+     * These default constructors and assignment operators duly invoke methods in this class as needed
      *
      * When we create a rvalue of our container (view) an embedded instance of this class is created
      * When our container (view) is moved say inside another view another instance of this class is created
