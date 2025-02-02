@@ -37,6 +37,10 @@ namespace util::memory_counter {
         unsigned moved = 0;
     };
 
+    /**
+     * All instances of containers within a single test run share the same set of counts, they are kept here
+     * Each unit tests simply keeps an instance of this class on stack
+     */
     class MemoryCounts {
         unsigned constructed = 0;
         unsigned copied = 0;
@@ -62,6 +66,23 @@ namespace util::memory_counter {
         return os;
     }
 
+    /**
+     * We embed an instance of this class into our containers
+     * We then use default copy/move constructors and assignment on those containers
+     * These default cont constructors and assignment operators then invoke methods in this class as needed
+     *
+     * When we create a rvalue of our container (view) an embedded instance of this class is created
+     * When our container (view) is moved say inside another view another instance of this class is created
+     * and "move" between instances happens
+     *
+     * This allows us to count how many of each operation actually happened
+     * All those instances within same test share a pointer to the same instance of MemoryCounts
+     *
+     * We use a pointer as it doesn't preclude default constructors and operator='s from being generated
+     * on the container we embed this class into
+     *
+     * Otherwise it could have been a reference
+     */
     class MemoryCounter {
         MemoryCounts* _counts;
         bool _haveData;
