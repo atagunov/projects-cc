@@ -10,11 +10,11 @@
 
     The class imitates a container.
     Initially it considers itself to have data ('_haveData' set to true)
-    Simultaneously 'created' is set to 1.
+    Simultaneously 'created' is increased by 1, generally it should have been at zero so result should be 1
 
     Then on each copy we increase 'copied'
-    On each destructor invocation we increase 'released'
-    During a copy if we had '_haveData' set to true we also increase 'freed' as container would release memory
+    On each destructor invocation we increase 'freed'
+    During a copy if we had '_haveData' set to true we also increase 'freed' as container would release old memory at this point
 
     On each move we increase 'moved' and also flip '_haveData' on that instance to false
     Further any attemp to copy or move from that instance do not increase any numbers, it beahves as an empty container
