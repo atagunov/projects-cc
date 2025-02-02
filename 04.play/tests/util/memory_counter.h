@@ -2,7 +2,7 @@
 #include <iostream>
 
 /*
-    This is file contains sort of a testing utility
+    This file contains sort of a testing utility
     The idea is to make sure util::str_split::LinesSplitView correctly creates an owning view when needed
 
     To that end we extend std::string with memory counts which tell us now many times our
