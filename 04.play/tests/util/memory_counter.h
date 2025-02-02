@@ -81,8 +81,8 @@ namespace util::memory_counter {
      * We use a pointer as it is easy to copy it between instances
      * Generally we shouldn't have needed to copy it around given the way currently existing unit tests are written
      *
-     * However to make the code more general the possibility of using multiple instances of MemoryCounts in the same
-     * unit tests is supported
+     * However the possibility the code is written in a bit more generalw way
+     * allowing use of more than one instance of MemoryCounts per unit test
      */
     class MemoryCounter {
         MemoryCounts* _counts;
