@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.31)
 
 project(04.play VERSION 0.1.0 LANGUAGES CXX)
 
+find_package(folly REQUIRED)
+find_package(fmt REQUIRED)
 find_package(Boost REQUIRED)
 find_package(GTest REQUIRED)
 

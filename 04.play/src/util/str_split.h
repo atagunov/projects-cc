@@ -138,21 +138,45 @@ namespace util::str_split {
         View _subview;
     public:
         /**
-         * Been a big debate: View&& or View
+         * It was a big question:
          *
-         * View classes from standard library typically take View
-         * apparenlty because views are generally cheap to copy
-         * and probably also because the compilers are so good at eliding copies
-         * of prvalues these days
+         * - provide a single constructor taking V
+         * - or provide two constructors taking V& and V&&
          *
-         * owning_view is kind of an exception, but a prvalue + compiler optimizations
-         * solve the issue - it still doesn't get copied - most of the time likely
+         * Either way we're going to store a copy of the view
+         * so that we can store an owned_view
          *
-         * It'd probably take an explicit instantiation of an owning_view as an lvalue to force a copy
+         * Classes in standard library seems to prefer providing one constructor taking simply V
+         * This probably can be explained by the following considerations
          *
-         * Taking by value enables passing lvalue view here if so desired
+         * - views are cheap to move
+         * - compilers are exceptionally good at eliding constructor invocations for prvalues
+         *
+         * We could definitely follow the example of the standard library and take V
+         * However this class provides two constructor overloads: const V& and const V&&
+         *
+         * Through testing it has been discovered that with this setup it is still possible
+         * to have one less move when a view (not just a range) is passed in
+         *
+         * The win is very small but the loss is small as well - one line of code
+         *
+         * Note that we're relying on dedeuction guide which ensures that View can be
+         * ref_view<UnderlyingRange> or owning_view<UnderlyingRange> if the argument passed
+         * in is not itself a view
+         *
+         * This seems slightly confusing and inconsistent that the class has different behavior
+         * depending on what we pass in: std:string or std::string_view
+         *
+         * However in this regard the class is following the example of standard library
          */
-        constexpr LinesSplitView(View v): _subview(std::move(v)) {};
+        constexpr LinesSplitView(View&& v)
+        noexcept(std::is_nothrow_move_constructible_v<View>)
+        : _subview(std::move(v)) {};
+
+        constexpr LinesSplitView(const View& v)
+        noexcept(std::is_nothrow_copy_constructible_v<View>)
+        : _subview(v) {};
+
         constexpr auto begin() const {
             return LinesSplitIterator(_subview.begin(), _subview.end()); 
         }

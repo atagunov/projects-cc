@@ -23,14 +23,14 @@
 
 namespace util::memory_counter {
     /** Most of the time compiler does optimizations but we don't want to check them so don't really check number of moves */
-    struct CheckValues {
+    struct MiniCheckValues {
         unsigned constructed = 0;
         unsigned copied = 0;
         unsigned freed = 0;
     };
 
     /** Sometimes we know compiler cannot optimize so we can check number of moves too */
-    struct ExtendedCheckValues {
+    struct CheckValues {
         unsigned constructed = 0;
         unsigned copied = 0;
         unsigned freed = 0;
@@ -49,12 +49,12 @@ namespace util::memory_counter {
         friend class MemoryCounter;
         friend std::ostream& operator<<(std::ostream&, const MemoryCounts&);
     public:
-        bool check(CheckValues e) {
+        bool checkMini(MiniCheckValues e) {
             return constructed == e.constructed && copied == e.copied
                     && freed == e.freed;
         }
 
-        bool extendedCheck(ExtendedCheckValues e) {
+        bool check(CheckValues e) {
             return constructed == e.constructed && copied == e.copied
                     && freed == e.freed && moved == e.moved;
         }

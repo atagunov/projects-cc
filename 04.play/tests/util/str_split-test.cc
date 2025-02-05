@@ -75,31 +75,33 @@ public:
 TEST(str_split, canUseOwningView) {
     util::memory_counter::MemoryCounts counts;
     {
+        // 2 moves detected, constructing owning_view then LinesSplitView
         LinesSplitView view{TracedString{"abcdefghijklmopqrt\n14", counts}};
-        EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 0})) << " but it was " << counts;
+        EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 0, .moved = 2})) << " but it was " << counts;
     }
-    EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 1})) << " but it was " << counts;
+    EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 1, .moved = 2})) << " but it was " << counts;
 }
 
 TEST(str_split, canUseOwningViewExplicitly) {
     util::memory_counter::MemoryCounts counts;
     {
+        // 2 moves detected, constructing owning_view then LinesSplitView
         LinesSplitView view{std::ranges::owning_view{TracedString{"abcdefghijklmopqrt\n14", counts}}};
-        EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 0})) << " but it was " << counts;
+        EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 0, .moved = 2})) << " but it was " << counts;
     }
-    EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 1})) << " but it was " << counts;
+    EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 1, .moved = 2})) << " but it was " << counts;
 }
 
 TEST(str_split, canUseRefView) {
     util::memory_counter::MemoryCounts counts;
     {
-        /* std::string functions as a range not view */
+        // std::string functions as a range not view
+        // ref_view gets constructed
         auto range = TracedString{"abcdefghijklmopqrt\n14", counts};
-        /* this still works because std::ranges::views::all_t conversion is happening constructing RefView temporary */
         LinesSplitView view{range};
-        EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 0})) << " but it was " << counts;
+        EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 0, .moved = 0})) << " but it was " << counts;
     }
-    EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 1})) << " but it was " << counts;
+    EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 1, .moved = 0})) << " but it was " << counts;
 }
 
 class TracedStringView: public std::ranges::view_interface<TracedStringView>, public std::string_view, util::memory_counter::MemoryCounter {
@@ -116,10 +118,11 @@ static_assert(std::ranges::view<TracedStringView>);
 TEST(str_split, acceptsViewRValue) {
     util::memory_counter::MemoryCounts counts;
     {
+        // 1 move, constructing LinesSplitView
         LinesSplitView view{TracedStringView{"abcdefghijklmopqrt\n14", counts}};
-        EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 0})) << " but it was " << counts;
+        EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 0, .moved = 1})) << " but it was " << counts;
     }
-    EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 1})) << " but it was " << counts;
+    EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 1, .moved = 1})) << " but it was " << counts;
 }
 
 TEST(str_split, acceptsViewLValue) {
@@ -127,9 +130,21 @@ TEST(str_split, acceptsViewLValue) {
     TracedStringView underlyingView{"abcdefghijklmopqrt\n14", counts};
     {
         LinesSplitView view{underlyingView};
-        EXPECT_TRUE(counts.check({.constructed = 1, .copied = 1, .freed = 0})) << " but it was " << counts;
+        // interestingly this is the only way we managed the machinery copy not move something - a TracedStringView in this case
+        // it can be argued this is kind of by design: we want LineSplitView to contain a copy of the view
+        // that we pass in in case it's an OwningView; and here we're passing a lvalue of view type
+        // so it has to copy; std::ranges::all doesn't wrap view lvalues in std::ref_view, so an actual copy happens
+        // guess it's a cautionary tail, if we really move to move the view we got to std::move it 1st
+        //
+        // it can be argued that this behavior is a little confusing: say std::string lvalue will get wrapped into std::ref_view
+        // but something that is already a view will get copied; but we're just following standard library
+        //
+        // when this same test was run with LinesSplitView having one constructor taking view by value
+        // we had 1 extra move on top of the copy that was happening either way
+        // now that separate const V& and V&& overloads we don't have any moves, just a copy
+        EXPECT_TRUE(counts.check({.constructed = 1, .copied = 1, .freed = 0, .moved = 0})) << " but it was " << counts;
     }
-    EXPECT_TRUE(counts.check({.constructed = 1, .copied = 1, .freed = 1})) << " but it was " << counts;
+    EXPECT_TRUE(counts.check({.constructed = 1, .copied = 1, .freed = 1, .moved = 0})) << " but it was " << counts;
 }
 
 TEST(str_split, acceptsViewLValueViaStdMove) {
@@ -137,7 +152,11 @@ TEST(str_split, acceptsViewLValueViaStdMove) {
     TracedStringView underlyingView{"abcdefghijklmopqrt\n14", counts};
     {
         LinesSplitView<TracedStringView> view{std::move(underlyingView)};
-        EXPECT_TRUE(counts.extendedCheck({.constructed = 1, .copied = 0, .freed = 0, .moved = 2})) << " but it was " << counts;
+
+        // when this same test was run with LinesSplitView having one constructor taking view by value
+        // we had 2 moves in this test
+        // now that separate const V& and V&& overloads have been provided it's just 1
+        EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 0, .moved = 1})) << " but it was " << counts;
     }
-    EXPECT_TRUE(counts.extendedCheck({.constructed = 1, .copied = 0, .freed = 1, .moved = 2})) << " but it was " << counts;
+    EXPECT_TRUE(counts.check({.constructed = 1, .copied = 0, .freed = 1, .moved = 1})) << " but it was " << counts;
 }

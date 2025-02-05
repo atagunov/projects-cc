@@ -20,7 +20,6 @@ using namespace std::literals::string_literals;
 
 // Interestingly all of these are only experimental in libcxx version 19
 // even though it's supposed to be C++20
-using std::osyncstream;
 using std::jthread;
 using std::stop_token;
 
@@ -37,7 +36,7 @@ using std::stop_token;
 // just the same as with const string& but we'd be getting a mutable reference to it
 void runCooperative(stop_token stopToken, const string& threadName) {
     while (!stopToken.stop_requested()) {
-        osyncstream{cout} << "thread " << threadName << " is running" << endl;
+        cout << "thread " << threadName << " is running" << endl;
         sleep_for(milliseconds(500));
     }
 
@@ -45,7 +44,7 @@ void runCooperative(stop_token stopToken, const string& threadName) {
 }
 
 void runSimple(string threadName) {
-    osyncstream{cout} << "thread " << threadName << " running once" << endl;
+    cout << "thread " << threadName << " running once" << endl;
 }
 
 int main() {

@@ -1,7 +1,8 @@
 #pragma once
 
 #include <iostream>
-#include <print>
+#include <fmt/core.h>
+#include <fmt/ostream.h>
 
 #include <boost/log/attributes.hpp>
 #include <boost/log/sinks.hpp>
@@ -49,10 +50,11 @@ namespace util::log {
                 return exc;
             }
 
-            template <typename... Prefixes> using FormatStringT = std::format_string<const Prefixes&...>;
+            template <typename... Prefixes> using FormatStringT = fmt::format_string<const Prefixes&...>;
             template <typename... Prefixes> static void print(boost::log::record_ostream& ros,
                     FormatStringT<Prefixes...> fmt, const Prefixes&... prefixes, const Exc&) {
-                std::print(ros.stream(), fmt, prefixes...);
+                /* on c++23 we could hav eused fmt::print here, for now let's use {fmt} */
+                fmt::print(ros.stream(), fmt, prefixes...);
             }
         };
 
@@ -142,23 +144,23 @@ namespace util::log {
 
         /** This version will get used if last arg is not an exception of if there are no args */
         template<typename ...Args>
-        void _log(severity_level severityLevel, std::format_string<const Args&...> fmt, const Args&... args) {
+        void _log(severity_level severityLevel, fmt::format_string<const Args&...> fmt, const Args&... args) {
             using boost::log::keywords::severity;
 
             if (auto record = this->open_record(severity = severityLevel)) {
                 ros_t ros{record};
-                std::print(ros.stream(), fmt, args...);
+                fmt::print(ros.stream(), fmt, args...);
                 this->push_record(std::move(record));
             }
         }
 
         template<typename ...Args> void _logWithCurrentException(severity_level severityLevel,
-                std::format_string<Args...> fmt, const Args&... args) {
+                fmt::format_string<Args...> fmt, const Args&... args) {
             using boost::log::keywords::severity;
 
             if (auto record = this->open_record(severity = severityLevel)) {
                 ros_t ros{record};
-                std::print(ros.stream(), fmt, args...);
+                fmt::print(ros.stream(), fmt, args...);
                 _appendException(ros, std::current_exception());
                 ros.flush();
                 this->push_record(std::move(record));
@@ -173,7 +175,7 @@ namespace util::log {
 
         template<typename ...Args>
         requires (!_detail::EndsInException<Args...>) // selects wrong template without this
-        void debug(std::format_string<const Args&...> fmt, const Args&... args) {
+        void debug(fmt::format_string<const Args&...> fmt, const Args&... args) {
             _log(DEBUG, fmt, args...);
         }
 
@@ -185,7 +187,7 @@ namespace util::log {
 
         template<typename ...Args>
         requires (!_detail::EndsInException<Args...>) // selects wrong template without this
-        void info(std::format_string<const Args&...> fmt, const Args&... args) {
+        void info(fmt::format_string<const Args&...> fmt, const Args&... args) {
             _log(INFO, fmt, args...);
         }
 
@@ -197,7 +199,7 @@ namespace util::log {
 
         template<typename ...Args>
         requires (!_detail::EndsInException<Args...>) // selects wrong template without this
-        void warn(std::format_string<const Args&...> fmt, const Args&... args) {
+        void warn(fmt::format_string<const Args&...> fmt, const Args&... args) {
             _log(WARN, fmt, args...);
         }
 
@@ -209,15 +211,15 @@ namespace util::log {
 
         template<typename ...Args>
         requires (!_detail::EndsInException<Args...>) // selects wrong template without this
-        void error(std::format_string<const Args&...> fmt, const Args&... args) {
+        void error(fmt::format_string<const Args&...> fmt, const Args&... args) {
             _log(ERROR, fmt, args...);
         }
 
-        template<typename ...Args> void warnWithCurrentException(std::format_string<const Args&...> fmt, const Args&... args) {
+        template<typename ...Args> void warnWithCurrentException(fmt::format_string<const Args&...> fmt, const Args&... args) {
             _logWithCurrentException(WARN, fmt, args...);
         }
 
-        template<typename ...Args> void errorWithCurrentException(std::format_string<const Args&...> fmt, const Args&... args) {
+        template<typename ...Args> void errorWithCurrentException(fmt::format_string<const Args&...> fmt, const Args&... args) {
             _logWithCurrentException(ERROR, fmt, args...);
         }
 
