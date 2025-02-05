@@ -53,7 +53,7 @@ namespace util::log {
             template <typename... Prefixes> using FormatStringT = fmt::format_string<const Prefixes&...>;
             template <typename... Prefixes> static void print(boost::log::record_ostream& ros,
                     FormatStringT<Prefixes...> fmt, const Prefixes&... prefixes, const Exc&) {
-                /* on c++23 we could have used fmt::print here, for now let's use {fmt} */
+                /* on c++23 we could have used std::print here, for now let's use {fmt} */
                 fmt::print(ros.stream(), fmt, prefixes...);
             }
         };
