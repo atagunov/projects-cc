@@ -78,7 +78,7 @@ namespace util::str_split {
         LinesSplitIterator& operator++() {
             _start = _next;
             if (_next == _underlyingStop) {
-                _stop = _underlyingStop; // so that we compare as equal to end iterator
+                _stop = _next; // so that we compare as equal to end iterator
                 return *this;
             }
 

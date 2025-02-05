@@ -68,7 +68,7 @@ namespace util::log {
             /**
              * Builds format_string type out of any types from
              * - upper levels of recursion (Prefixes...)
-             * - curren tlevel of recursion (T)
+             * - current level of recursion (T)
              * - lower levels of recursion (Rest...) - except trailing ExcT is excluded
              */
             template <typename... Prefixes> using FormatStringT = FormatHelper<Rest...>::template
@@ -77,7 +77,7 @@ namespace util::log {
             /**
              * Prints formatted message using parameters from
              * - upper level of recursion (prefixes...)
-             * - this level of recursion (t)
+             * - current level of recursion (t)
              * - lower levels of recursion (rest...) - except trailing exception is not included
              */
             template <typename... Prefixes> static void print(boost::log::record_ostream& ros,
@@ -103,7 +103,6 @@ namespace util::log {
          * MARKER type here identifies a unique logger instance
          */
         template<class T, typename MARKER> inline T& _getThreadLocal() {
-            // since C++11 executed exactly once
             thread_local T t{boost::typeindex::type_id<MARKER>().pretty_name()};
             return t;
         }
@@ -138,6 +137,7 @@ namespace util::log {
                 ros_t ros{record};
                 _detail::FormatHelper<Args...>::template print<>(ros, fmt, args...);
                 _appendException(ros, _detail::FormatHelper<Args...>::getExc(args...));
+                ros.flush();
                 this->push_record(std::move(record));
             }
         }
@@ -150,6 +150,7 @@ namespace util::log {
             if (auto record = this->open_record(severity = severityLevel)) {
                 ros_t ros{record};
                 fmt::print(ros.stream(), fmt, args...);
+                ros.flush();
                 this->push_record(std::move(record));
             }
         }

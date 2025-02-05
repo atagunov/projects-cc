@@ -41,7 +41,7 @@ namespace {
      */
     std::atomic<boost::stacktrace::detail::native_frame_ptr_t> stopTracesHere;
 
-    void appendLevel(record_ostream& ros, int level) {
+    void appendTabs(record_ostream& ros, int level) {
         for (int i = 0; i < level; ++i) {
             ros << '\t';
         }
@@ -51,10 +51,10 @@ namespace {
         int counter = 0;
         for (auto& frame : traceView) {
             if (counter++ == bannerAt) {
-                appendLevel(ros, level);
+                appendTabs(ros, level);
                 ros << "--stacktrace-converges-with-this-thread--" << std::endl;
             }
-            appendLevel(ros, level);
+            appendTabs(ros, level);
             ros << "@ ";
             ros << frame;
             ros << std::endl;
@@ -127,7 +127,7 @@ namespace {
         try {
             std::rethrow_if_nested(e);
         } catch (const std::exception& nested) {
-            appendLevel(ros, level);
+            appendTabs(ros, level);
             ros << "caused by";
             appendStdExceptionInfo(ros, nested, level + 1, std::move(prev));
         } catch (...) {
