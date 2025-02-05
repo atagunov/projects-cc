@@ -158,9 +158,9 @@ namespace util::str_split {
          * Through testing it has been discovered that with this setup it is still possible
          * to have one less move when a view (not just a range) is passed in
          *
-         * The win is very small but the loss is small as well - one line of code
+         * The win is very small but the loss is small as well - few line of code
          *
-         * Note that we're relying on dedeuction guide which ensures that View can be
+         * Note that we're relying on deduction guide which ensures that View can be
          * ref_view<UnderlyingRange> or owning_view<UnderlyingRange> if the argument passed
          * in is not itself a view
          *
